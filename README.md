@@ -53,13 +53,16 @@ table as defence in depth.
 
 | | Math | Reading & Writing |
 |---|---|---|
-| SAT | 942 | 746 |
-| PSAT/NMSQT & PSAT 10 | 849 | 746 |
-| PSAT 8/9 | 689 | 561 |
+| SAT | 865 | 746 |
+| PSAT/NMSQT & PSAT 10 | 777 | 746 |
+| PSAT 8/9 | 637 | 561 |
 
-Counts are non-live, gradable items. Math includes legacy disclosed items
-(toggleable); a minority of those ship without an answer key, so they are marked
-ungradable on first fetch and never offered again.
+Counts are non-live, gradable items. The non-live catalog matches the educator
+question bank exactly — same `lookup` / `get-questions` requests the site makes,
+same `mathLiveItems` / `readingLiveItems` sets behind its "Exclude Active
+Questions" toggle. Math also includes the legacy disclosed items (toggleable);
+81 of those ship without an answer key, which is the entire gap between what the
+bank lists and what is counted above.
 
 ## Layout
 
@@ -68,7 +71,7 @@ lib/qbank/        TypeScript port of the College Board client, normalizer, grade
 lib/db/           schema.sql, Postgres client, every query, catalog sync
 components/exam/  the Bluebook replica
 app/              routes and API handlers
-scripts/          verify.ts (end-to-end checks), shoot.mjs (screenshots), dev-session.ts
+scripts/          verify.ts (end-to-end checks), backfill.ts, shoot.mjs, dev-session.ts
 ```
 
 ## Verifying
@@ -80,3 +83,14 @@ npx tsx --env-file=.env scripts/verify.ts
 Syncs the catalog and asserts the live-item guard, selection filters, question
 normalization for both sources, grading (including SPR fraction/decimal
 equivalence), and that no live or ungradable question can reach a drill.
+
+## Backfilling
+
+```bash
+npx tsx --env-file=.env scripts/backfill.ts
+```
+
+Downloads every non-live question body so gradability is known before a drill
+asks for it. Skip this and the per-skill counts overstate the pool — an item is
+only found to be missing its answer key when a drill happens to draw it. The run
+is resumable; `--refetch` re-downloads bodies that are already cached.

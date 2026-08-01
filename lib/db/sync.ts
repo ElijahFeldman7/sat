@@ -127,7 +127,7 @@ export async function syncCatalog(
       const seen = new Set<string>();
 
       for (const q of summaries) {
-        const externalId = q.external_id?.toLowerCase() ?? null;
+        const externalId = q.external_id?.trim().toLowerCase() || null;
         const ibn = q.ibn?.trim() || null;
         if (!externalId && !ibn) continue;
 
@@ -142,9 +142,13 @@ export async function syncCatalog(
           ibn,
           uid: q.uId ?? null,
           questionId: q.questionId ?? null,
-          domainCode: q.primary_class_cd,
-          domainName: q.primary_class_cd_desc,
-          skillName: q.skill_desc,
+          domainCode: q.primary_class_cd.trim(),
+          // get-questions ships three math skills with a trailing space
+          // ("Inference from sample statistics and margin of error ") that the
+          // lookup endpoint does not. The educator site trims before matching
+          // skills; so must we, or those topics look like distinct skills.
+          domainName: q.primary_class_cd_desc.trim(),
+          skillName: q.skill_desc.trim(),
           difficulty: q.difficulty,
           scoreBand: q.score_band_range_cd ?? null,
           isLive: !!externalId && live.has(externalId),

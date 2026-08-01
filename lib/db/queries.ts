@@ -326,10 +326,34 @@ export async function getCachedDetails(keys: string[]): Promise<Map<string, Norm
   return new Map(rows.map((r) => [r.key, toNormalized(r)]));
 }
 
-/** One statement for the whole batch rather than a round trip per question. */
+/**
+ * Bytes of question HTML per INSERT. Legacy disclosed items inline their
+ * diagrams as base64 and run to half a megabyte each, so a batch has to be
+ * split by weight rather than by row count or a backfill overruns the
+ * pooler's message limit.
+ */
+const DETAIL_CHUNK_BYTES = 4 * 1024 * 1024;
+
+/** One statement per batch rather than a round trip per question. */
 export async function cacheDetails(questions: NormalizedQuestion[]) {
   if (questions.length === 0) return;
 
+  let chunk: NormalizedQuestion[] = [];
+  let bytes = 0;
+  for (const q of questions) {
+    const weight = q.stem.length + (q.stimulus?.length ?? 0) + q.rationale.length;
+    if (chunk.length && bytes + weight > DETAIL_CHUNK_BYTES) {
+      await insertDetails(chunk);
+      chunk = [];
+      bytes = 0;
+    }
+    chunk.push(q);
+    bytes += weight;
+  }
+  if (chunk.length) await insertDetails(chunk);
+}
+
+async function insertDetails(questions: NormalizedQuestion[]) {
   await sql()`
     INSERT INTO question_details
       (key, type, stem, stimulus, rationale, options, correct_keys, correct_letter, gradable, fetched_at)
