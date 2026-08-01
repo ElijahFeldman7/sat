@@ -1,0 +1,211 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens sampled pixel-by-pixel from the Bluebook screenshots in
+ * /public. Reference viewport: 1470 x 890.
+ */
+@theme {
+  --color-bb-band: #e7edf7; /* header + footer band */
+  --color-bb-ink: #1e1e1e; /* text, number square, nav pill */
+  --color-bb-blue: #384cc0; /* Next button, ABC toggle, links */
+  --color-bb-blue-hover: #2c3da3;
+  --color-bb-strip: #f0f0f0; /* question header strip */
+  --color-bb-border: #505050; /* answer choice border */
+  --color-bb-divider: #888888; /* split-pane rule */
+  --color-bb-navy: #1c2260; /* banner */
+  --color-bb-review: #a12b2b; /* "For Review" flag */
+
+  --font-bb-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-bb-serif: Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: #ffffff;
+  color: var(--color-bb-ink);
+  font-family: var(--font-bb-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * Bluebook's signature dashed rules: 21px dash / 2px gap, 2px thick.
+ * A gradient gives exact control that `border-style: dashed` does not.
+ */
+.bb-dash-b {
+  background-image: repeating-linear-gradient(to right, #000 0 21px, transparent 21px 23px);
+  background-repeat: no-repeat;
+  background-size: 100% 2px;
+  background-position: bottom left;
+}
+
+.bb-dash-t {
+  background-image: repeating-linear-gradient(to right, #000 0 21px, transparent 21px 23px);
+  background-repeat: no-repeat;
+  background-size: 100% 2px;
+  background-position: top left;
+}
+
+/* ------------------------------------------------------------------ */
+/* Question content injected from the College Board bank                */
+/* ------------------------------------------------------------------ */
+
+.qbank {
+  font-family: var(--font-bb-serif);
+  font-size: 19px;
+  line-height: 1.55;
+  color: #000;
+}
+
+.qbank p {
+  margin: 0 0 1em;
+}
+
+.qbank p:last-child {
+  margin-bottom: 0;
+}
+
+.qbank ul,
+.qbank ol {
+  margin: 0 0 1em 1.6em;
+}
+
+.qbank ul {
+  list-style: disc;
+}
+
+.qbank ol {
+  list-style: decimal;
+}
+
+.qbank li {
+  margin-bottom: 0.35em;
+}
+
+.qbank em,
+.qbank i {
+  font-style: italic;
+}
+
+.qbank strong,
+.qbank b {
+  font-weight: 700;
+}
+
+.qbank sub {
+  vertical-align: sub;
+  font-size: 0.75em;
+}
+
+.qbank sup {
+  vertical-align: super;
+  font-size: 0.75em;
+}
+
+/* The bank wraps tables in nested <figure class="table"> elements. */
+.qbank figure {
+  margin: 0 0 1em;
+  overflow-x: auto;
+}
+
+.qbank figure figure {
+  margin: 0;
+}
+
+.qbank table {
+  border-collapse: collapse;
+  margin: 0 auto;
+  font-size: 17px;
+}
+
+.qbank th,
+.qbank td {
+  border: 1px solid #000;
+  padding: 8px 12px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.qbank th {
+  font-weight: 400;
+}
+
+.qbank caption {
+  caption-side: top;
+  padding-bottom: 8px;
+  text-align: center;
+}
+
+.qbank img,
+.qbank svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* MathML renders natively in Chrome/Safari/Firefox — just keep it in flow. */
+.qbank math {
+  font-size: 1.02em;
+  max-width: 100%;
+}
+
+.qbank .math-container {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.qbank .math-img {
+  vertical-align: middle;
+}
+
+.qbank .italic {
+  font-style: italic;
+}
+
+/* Passage highlights */
+.qbank mark.bb-hl {
+  background: #ffe484;
+  padding: 0.05em 0;
+  border-radius: 2px;
+}
+
+/* Scrollbars inside exam panes stay out of the way until hovered. */
+.bb-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #c4c4c4 transparent;
+}
+
+.bb-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.bb-scroll::-webkit-scrollbar-thumb {
+  background: #c4c4c4;
+  border-radius: 5px;
+}
+
+.bb-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes bb-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.bb-pop {
+  animation: bb-fade-up 120ms ease-out;
+}
