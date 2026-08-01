@@ -12,7 +12,7 @@ export default async function ResultsPage({ params }: { params: Promise<{ id: st
   const user = await requireUser();
   const { id } = await params;
 
-  const [set, rows] = await Promise.all([getDrillSet(id, user.id), getDrillQuestions(id)]);
+  const [set, rows] = await Promise.all([getDrillSet(id, user.id), getDrillQuestions(id, user.id)]);
 
   if (!set) notFound();
   if (set.status !== "complete") redirect(`/session/${id}`);

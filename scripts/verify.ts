@@ -190,7 +190,7 @@ async function main() {
   });
   check("created a full set", drill.count === 10, `${drill.count}/${drill.requested}`);
 
-  const rows = await getDrillQuestions(drill.id);
+  const rows = await getDrillQuestions(drill.id, "verify-user");
   check("rows join back to the catalog", rows.every((r) => !!r.skill_name));
 
   const drillDetails = await loadDetails(rows);

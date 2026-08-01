@@ -13,7 +13,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
 
   // Two round trips instead of four: the set and its questions are independent
   // reads, as are the question bodies and this user's highlights.
-  const [set, rows] = await Promise.all([getDrillSet(id, user.id), getDrillQuestions(id)]);
+  const [set, rows] = await Promise.all([getDrillSet(id, user.id), getDrillQuestions(id, user.id)]);
 
   if (!set) notFound();
   if (set.status === "complete") redirect(`/results/${id}`);

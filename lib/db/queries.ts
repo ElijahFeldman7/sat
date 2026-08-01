@@ -439,7 +439,15 @@ export interface DrillQuestionRow {
   external_id: string | null;
 }
 
-export async function getDrillQuestions(setId: string): Promise<DrillQuestionRow[]> {
+/**
+ * Scoped by owner, not just by set id. The join already passes through
+ * `drill_sets`, so the ownership check is free — and it means a caller cannot
+ * read another account's questions even if it forgets to check the set first.
+ */
+export async function getDrillQuestions(
+  setId: string,
+  userId: string,
+): Promise<DrillQuestionRow[]> {
   return all<DrillQuestionRow>(
     `SELECT dq.*, dq.question_key AS key,
             q.skill_name, q.domain_name, q.difficulty, q.source, q.ibn, q.external_id
@@ -448,9 +456,9 @@ export async function getDrillQuestions(setId: string): Promise<DrillQuestionRow
      JOIN questions q ON q.key = dq.question_key
                      AND q.assessment_id = ds.assessment_id
                      AND q.module = ds.module
-     WHERE dq.set_id = ?
+     WHERE dq.set_id = ? AND ds.user_id = ?
      ORDER BY dq.idx`,
-    [setId],
+    [setId, userId],
   );
 }
 

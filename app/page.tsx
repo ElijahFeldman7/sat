@@ -39,10 +39,6 @@ export default async function LandingPage() {
               Continue with Google
             </button>
           </form>
-
-          <p className="mt-[26px] text-[14px] text-black/45">
-            Your progress is stored locally on this machine.
-          </p>
         </div>
       </main>
     </div>

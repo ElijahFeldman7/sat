@@ -18,7 +18,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const user = await requireUser();
     const { id } = await params;
 
-    const [set, rows] = await Promise.all([getDrillSet(id, user.id), getDrillQuestions(id)]);
+    const [set, rows] = await Promise.all([getDrillSet(id, user.id), getDrillQuestions(id, user.id)]);
     if (!set) throw new Error("Drill set not found");
 
     const details = await loadDetails(rows);
