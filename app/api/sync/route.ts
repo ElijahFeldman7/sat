@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/session";
 import { lastSyncedAt, syncCatalog } from "@/lib/db/sync";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 export async function POST() {
   return handle(async () => {

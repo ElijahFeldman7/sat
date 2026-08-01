@@ -11,7 +11,7 @@ import { loadDetails } from "@/lib/questions";
 import { gradeAnswer } from "@/lib/qbank/grade";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return handle(async () => {

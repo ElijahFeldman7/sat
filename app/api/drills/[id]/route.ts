@@ -11,7 +11,7 @@ import {
 import { loadDetails, toExamQuestion } from "@/lib/questions";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return handle(async () => {

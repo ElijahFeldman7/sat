@@ -1,6 +1,12 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import postgres from "postgres";
+import { SCHEMA_SQL } from "./schema";
+
+/**
+ * Serverless platforms run many short-lived instances, each with its own pool,
+ * against one shared pooler budget — so each instance keeps a single connection
+ * and releases it quickly. A long-lived local process can afford more.
+ */
+const SERVERLESS = !!process.env.VERCEL;
 
 /**
  * Postgres client for the Supabase project.
@@ -36,16 +42,14 @@ export function sql(): postgres.Sql {
   client = postgres(url, {
     ssl: "require",
     prepare: !isTransactionMode,
-    // Small pool: this is a single-instance app, and pooler connections are a
-    // shared project-wide budget.
-    max: 5,
-    idle_timeout: 20,
+    max: SERVERLESS ? 1 : 5,
+    idle_timeout: SERVERLESS ? 10 : 20,
     max_lifetime: 60 * 30,
     connect_timeout: 15,
     // Every query is written against the app's own schema.
     connection: { search_path: "sat, public" },
     transform: { undefined: null },
-    // schema.sql is idempotent, so every re-run emits "already exists" notices.
+    // The schema DDL is idempotent, so re-runs emit "already exists" notices.
     onnotice: () => {},
   });
 
@@ -54,23 +58,43 @@ export function sql(): postgres.Sql {
 
 let migrated: Promise<void> | null = null;
 
+/** Arbitrary but stable key for the schema-creation advisory lock. */
+const SCHEMA_LOCK = 4_820_119;
+
 /**
- * Applies schema.sql once per process. Every statement is idempotent, but it is
- * ~40 statements and each request pays for a round trip to the database, so
- * probe for an existing schema first and skip the DDL entirely when it's there.
+ * Applies the schema once per process.
+ *
+ * Every statement is idempotent, but it is ~40 of them and each request pays a
+ * round trip, so probe for an existing schema first and skip the DDL when it's
+ * already there. On a cold deploy many instances start at once, so the creation
+ * path takes an advisory lock and re-checks — otherwise concurrent CREATEs race
+ * and some error out.
  */
 export function ready(): Promise<void> {
   migrated ??= (async () => {
-    try {
-      await sql()`SELECT 1 FROM sat.sync_state LIMIT 1`;
-      return;
-    } catch {
-      // Schema missing or incomplete — fall through and create it.
-    }
-    const ddl = readFileSync(path.join(process.cwd(), "lib/db/schema.sql"), "utf8");
-    await sql().unsafe(ddl);
+    if (await schemaExists()) return;
+
+    await sql().begin(async (tx) => {
+      await tx`SELECT pg_advisory_xact_lock(${SCHEMA_LOCK})`;
+      // Another instance may have created it while we waited for the lock.
+      const [{ present }] = await tx<{ present: boolean }[]>`
+        SELECT to_regclass('sat.sync_state') IS NOT NULL AS present
+      `;
+      if (!present) await tx.unsafe(SCHEMA_SQL);
+    });
   })();
   return migrated;
+}
+
+async function schemaExists(): Promise<boolean> {
+  try {
+    const [row] = await sql()<{ present: boolean }[]>`
+      SELECT to_regclass('sat.sync_state') IS NOT NULL AS present
+    `;
+    return row?.present ?? false;
+  } catch {
+    return false;
+  }
 }
 
 /*

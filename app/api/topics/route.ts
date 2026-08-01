@@ -6,7 +6,7 @@ import { srsDueCount, topicTree } from "@/lib/db/queries";
 import { DEFAULT_ASSESSMENT_ID, type ModuleKey } from "@/lib/qbank/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
   return handle(async () => {

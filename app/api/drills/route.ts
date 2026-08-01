@@ -7,7 +7,7 @@ import { createDrill, createSrsDrill, weakestSkills } from "@/lib/drills";
 import { DEFAULT_ASSESSMENT_ID, type Difficulty, type ModuleKey } from "@/lib/qbank/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 interface Body {
   kind?: "topic" | "adaptive" | "srs";

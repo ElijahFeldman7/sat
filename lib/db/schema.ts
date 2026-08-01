@@ -1,9 +1,19 @@
+/**
+ * Database schema, as a module rather than a .sql file read at runtime.
+ *
+ * Serverless bundlers trace imports, not files opened by a computed path, so a
+ * `readFileSync` of schema.sql resolves in development and then throws ENOENT
+ * once deployed. Keeping the DDL in TypeScript guarantees it ships.
+ *
+ * Every statement is idempotent.
+ */
+export const SCHEMA_SQL = String.raw`
 -- Schema for the SAT drill app.
 --
--- Everything lives in a dedicated `sat` schema rather than `public`, so it is
+-- Everything lives in a dedicated \`sat\` schema rather than \`public\`, so it is
 -- never reachable through the Supabase Data API with the publishable key (the
 -- app talks to Postgres directly as the owner role). RLS is enabled on every
--- table as defence in depth: with no policies, `anon`/`authenticated` see
+-- table as defence in depth: with no policies, \`anon\`/\`authenticated\` see
 -- nothing even if the schema were later exposed.
 
 create schema if not exists sat;
@@ -21,7 +31,7 @@ create table if not exists sat.users (
   created_at  timestamptz not null default now()
 );
 
--- One row per question in the bank. `key` is the external_id when present,
+-- One row per question in the bank. \`key\` is the external_id when present,
 -- otherwise 'ibn:<IBN>' for legacy disclosed items.
 create table if not exists sat.questions (
   key           text        not null,
@@ -148,3 +158,4 @@ alter table sat.drill_questions  enable row level security;
 alter table sat.srs_queue        enable row level security;
 alter table sat.annotations      enable row level security;
 alter table sat.sync_state       enable row level security;
+`;
