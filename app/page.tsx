@@ -22,6 +22,9 @@ export default async function LandingPage() {
           <p className="mx-auto mt-[16px] max-w-[430px] text-[16px] leading-[1.55] text-black/70 sm:mt-[20px] sm:text-[18px]">
             Build targeted drills from the real College Board question bank, in an exam interface
             that matches Bluebook. Active test questions are always excluded.
+
+            Our website is <span className="text-bold">completely free, forever</span>. We have no
+            affiliation with Collegeboard or the SAT, and only serve to provide practice.
           </p>
 
           <form

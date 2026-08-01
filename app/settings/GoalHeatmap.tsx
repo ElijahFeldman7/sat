@@ -106,21 +106,19 @@ export function GoalHeatmap({
 
   return (
     <div>
-      {/* Hero number — the question the page exists to answer. */}
       <div className="flex flex-wrap items-baseline gap-x-[10px] gap-y-[2px]">
         <span className="text-[34px] font-bold leading-none tabular-nums text-bb-ink">
           {metCount}
         </span>
         <span className="text-[16px] text-black/60">
           {metCount === 1 ? "day" : "days"} hit your goal
-          {activeCount > 0 && ` · ${activeCount} ${activeCount === 1 ? "day" : "days"} practised`}
+          {activeCount > 0 && ` · ${activeCount} ${activeCount === 1 ? "day" : "days"} practiced`}
         </span>
       </div>
 
       <div className="relative mt-[16px]">
         <div className="-mx-[4px] overflow-x-auto px-[4px] pb-[4px] bb-scroll">
           <div className="inline-flex gap-[3px]">
-            {/* Weekday gutter: only alternate rows are labelled, as is conventional. */}
             <div className="mr-[4px] flex shrink-0 flex-col gap-[3px] pt-[18px]">
               {WEEKDAYS.map((d, i) => (
                 <div
@@ -160,8 +158,6 @@ export function GoalHeatmap({
                             : cell.level === 0
                               ? EMPTY
                               : RAMP[cell.level - 1],
-                          // Hitting the target is the point, so it gets a
-                          // second encoding rather than relying on colour.
                           outline: cell.metGoal ? "1.5px solid #1e1e1e" : "none",
                           outlineOffset: "-1.5px",
                         }}

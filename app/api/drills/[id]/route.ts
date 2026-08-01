@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { handle } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import {
+  deleteDrillSet,
   getDrillQuestions,
   getDrillSet,
   markStarted,
@@ -51,6 +52,17 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         };
       }),
     };
+  });
+}
+
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  return handle(async () => {
+    const user = await requireUser();
+    const { id } = await params;
+
+    if (!(await deleteDrillSet(id, user.id))) throw new Error("Drill set not found");
+
+    return { ok: true };
   });
 }
 

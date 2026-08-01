@@ -6,11 +6,7 @@ import { ready } from "@/lib/db/index";
 
 export const runtime = "nodejs";
 
-/**
- * The most a single beat may contribute. The client sends one roughly every
- * 60s, so anything larger is a clock jump, a replayed request, or a tab that
- * was asleep — none of which is time actually spent practising.
- */
+
 const MAX_SECONDS_PER_BEAT = 90;
 
 const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;

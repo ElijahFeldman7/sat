@@ -26,6 +26,44 @@ export async function countUsers(): Promise<number> {
   return Number(row?.n ?? 0);
 }
 
+export interface UserRow {
+  id: string;
+  email: string | null;
+  name: string | null;
+  createdAt: string;
+  drillSets: number;
+  seconds: number;
+}
+
+/** Every user with their activity totals, newest sign-up first. */
+export async function listUsers(limit = 500): Promise<UserRow[]> {
+  const rows = await all<{
+    id: string;
+    email: string | null;
+    name: string | null;
+    created_at: string;
+    drill_sets: string;
+    seconds: string;
+  }>(
+    `SELECT u.id, u.email, u.name,
+            to_char(u.created_at, 'YYYY-MM-DD') AS created_at,
+            (SELECT COUNT(*) FROM drill_sets d WHERE d.user_id = u.id) AS drill_sets,
+            (SELECT COALESCE(SUM(t.seconds), 0) FROM daily_time t WHERE t.user_id = u.id) AS seconds
+     FROM users u
+     ORDER BY u.created_at DESC
+     LIMIT ?`,
+    [limit],
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    email: r.email,
+    name: r.name,
+    createdAt: r.created_at,
+    drillSets: Number(r.drill_sets),
+    seconds: Number(r.seconds),
+  }));
+}
+
 // ---------------------------------------------------------------------------
 // Question selection
 // ---------------------------------------------------------------------------
@@ -529,6 +567,14 @@ export async function saveProgress(setId: string, patches: ProgressPatch[]) {
     ) p
     WHERE dq.set_id = ${setId}::uuid AND dq.idx = p.idx
   `;
+}
+
+export async function deleteDrillSet(setId: string, userId: string): Promise<boolean> {
+  const rows = await all<{ id: string }>(
+    "DELETE FROM drill_sets WHERE id = ?::uuid AND user_id = ? RETURNING id",
+    [setId, userId],
+  );
+  return rows.length > 0;
 }
 
 export async function markStarted(setId: string) {

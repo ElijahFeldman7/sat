@@ -4,6 +4,7 @@ import { Card } from "@/components/Card";
 import { requireUser } from "@/lib/session";
 import { listDrillSets } from "@/lib/db/queries";
 import { MODULES } from "@/lib/qbank/types";
+import { SetMenu } from "./SetMenu";
 
 export const dynamic = "force-dynamic";
 
@@ -71,12 +72,15 @@ export default async function HistoryPage() {
                     )}
                   </div>
 
-                  <Link
-                    href={done ? `/results/${s.id}` : `/session/${s.id}`}
-                    className="ml-auto shrink-0 rounded-full border border-bb-blue px-[18px] py-[8px] text-[14px] font-bold text-bb-blue hover:bg-bb-blue/5 md:ml-0"
-                  >
-                    {done ? "Review" : "Resume"}
-                  </Link>
+                  <div className="ml-auto flex shrink-0 items-center gap-[6px] md:ml-0">
+                    <Link
+                      href={done ? `/results/${s.id}` : `/session/${s.id}`}
+                      className="rounded-full border border-bb-blue px-[18px] py-[8px] text-[14px] font-bold text-bb-blue hover:bg-bb-blue/5"
+                    >
+                      {done ? "Review" : "Resume"}
+                    </Link>
+                    <SetMenu id={s.id} name={s.name} />
+                  </div>
                 </div>
               );
             })}

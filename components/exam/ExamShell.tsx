@@ -9,12 +9,12 @@ import { ExamFooter } from "./ExamFooter";
 import { ExamBanner } from "./ExamBanner";
 import { ExamHeader } from "./ExamHeader";
 import type { MoreMenuItem } from "./MoreMenu";
-import { EraserIcon, ExitIcon, HelpIcon, KeyboardIcon, ListIcon } from "./icons";
+import { EraserIcon, ExitIcon, HelpIcon, HighlightIcon, KeyboardIcon, ListIcon } from "./icons";
 import { QuestionHeader } from "./QuestionHeader";
 import { QuestionHtml } from "./QuestionHtml";
 import { QuestionNavPopover, toNavItems } from "./QuestionNav";
 import { ReviewPage } from "./ReviewPage";
-import { SplitPane } from "./SplitPane";
+import { SplitPane, type Pane } from "./SplitPane";
 import { SprInput } from "./SprInput";
 import { HighlightToolbar } from "./HighlightToolbar";
 import { useHighlighter } from "./useHighlighter";
@@ -42,7 +42,6 @@ export function ExamShell({
   const { set } = payload;
   const isMath = set.module === "math";
 
-  // Resuming a set drops you back on the first question you haven't answered.
   const initialIdx = Math.max(
     0,
     payload.questions.findIndex((q) => !q.userAnswer),
@@ -51,6 +50,7 @@ export function ExamShell({
   const [questions, setQuestions] = useState<ExamQuestionState[]>(payload.questions);
   const [currentIdx, setCurrentIdx] = useState(initialIdx);
   const [onReviewPage, setOnReviewPage] = useState(false);
+  const [pane, setPane] = useState<Pane>("passage");
   const [navOpen, setNavOpen] = useState(false);
   const [crossOutMode, setCrossOutMode] = useState(false);
   const [highlightsOn, setHighlightsOn] = useState(false);
@@ -67,17 +67,9 @@ export function ExamShell({
   const total = questions.length;
 
   useEffect(() => {
-    // Restoring a persisted preference is only possible after mount.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCalcWidth(loadDesmosWidth());
   }, []);
 
-  // ---------------------------------------------------------------- timers
-  /**
-   * Stopwatch for the question on screen. Kept in state rather than a ref so
-   * every render sees a value consistent with what it draws. It is re-based
-   * only in `goTo`/`commitTime`, never on autosaves.
-   */
   const [stopwatch, setStopwatch] = useState(() => ({
     startedAt: Date.now(),
     base: payload.questions[initialIdx]?.timeSpentMs ?? 0,
@@ -223,6 +215,7 @@ export function ExamShell({
       setStopwatch({ startedAt: Date.now(), base: questions[next]?.timeSpentMs ?? 0 });
       setOnReviewPage(false);
       setNavOpen(false);
+      setPane("passage");
     },
     [commitTime, questions, total],
   );
@@ -341,6 +334,13 @@ export function ExamShell({
   const moreItems = useMemo<MoreMenuItem[]>(
     () => [
       {
+        label: "Highlights & Notes",
+        icon: <HighlightIcon className="h-[22px] w-[22px]" />,
+        onSelect: () => setHighlightsOn((v) => !v),
+        mobileOnly: true,
+        on: highlightsOn,
+      },
+      {
         label: "Help",
         icon: <HelpIcon className="h-[22px] w-[22px]" />,
         onSelect: () => setShowDirections(true),
@@ -372,7 +372,7 @@ export function ExamShell({
         },
       },
     ],
-    [clearHighlights, commitTime, router],
+    [clearHighlights, commitTime, highlightsOn, router],
   );
 
   return (
@@ -425,6 +425,10 @@ export function ExamShell({
           ) : (
             <SplitPane
               singleColumn={!hasStimulus}
+              pane={pane}
+              onPaneChange={setPane}
+              passageLabel={isMath ? "Figure" : "Passage"}
+              answered={!!current.userAnswer}
               left={
                 <div
                   ref={stimulusRef}

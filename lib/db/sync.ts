@@ -116,13 +116,7 @@ async function upsertQuestions(
   }
 }
 
-/**
- * Refreshes the local question catalog for every assessment × module.
- *
- * `is_live` is set from the lookup endpoint's mathLiveItems/readingLiveItems —
- * questions currently in use on real tests. Nothing in the app may ever serve
- * one; see `availableQuestions` in queries.ts for where that is enforced.
- */
+
 export async function syncCatalog(
   force = false,
 ): Promise<{ synced: boolean; counts: Record<string, number> }> {
@@ -158,7 +152,6 @@ export async function syncCatalog(
         if (!externalId && !ibn) continue;
 
         const key = externalId ?? `ibn:${ibn}`;
-        // A single INSERT can't resolve conflicts within its own value list.
         if (seen.has(key)) continue;
         seen.add(key);
 
@@ -193,13 +186,8 @@ export async function syncCatalog(
   return { synced: true, counts };
 }
 
-/**
- * Confirmed-fresh timestamp for this process. Without it every page load spends
- * two database round trips re-asking a question whose answer changes once a day.
- */
 let freshUntil = 0;
 
-/** Syncs only if the catalog is empty or stale. */
 export async function ensureCatalog(): Promise<void> {
   if (Date.now() < freshUntil) return;
 

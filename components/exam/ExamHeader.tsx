@@ -95,6 +95,7 @@ export function ExamHeader({
         )}
 
         <ToolButton
+          className="hidden md:flex"
           onClick={onToggleHighlights}
           active={highlightsOn}
           label="Highlights & Notes"
@@ -136,6 +137,7 @@ function ToolButton({
   label,
   title,
   expanded,
+  className = "",
   children,
 }: {
   id?: string;
@@ -144,6 +146,7 @@ function ToolButton({
   label: string;
   title?: string;
   expanded?: boolean;
+  className?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -156,7 +159,7 @@ function ToolButton({
       aria-pressed={expanded === undefined ? active : undefined}
       aria-expanded={expanded}
       aria-haspopup={expanded === undefined ? undefined : "menu"}
-      className="flex flex-col items-center gap-[6px] text-[13px] leading-none text-bb-ink"
+      className={`flex flex-col items-center gap-[6px] text-[13px] leading-none text-bb-ink ${className}`}
     >
       {children}
       <span

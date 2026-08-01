@@ -125,6 +125,32 @@ export function useHighlighter({
     openAt(range.getBoundingClientRect(), false, null);
   }, [enabled, openAt]);
 
+  useEffect(() => {
+    if (!enabled) return;
+    if (!window.matchMedia?.("(pointer: coarse)").matches) return;
+
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const onSelectionChange = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        const selection = window.getSelection();
+        if (!selection || selection.isCollapsed) return;
+        const range = selection.getRangeAt(0);
+        const root = stimulusRef.current;
+        if (!root || !root.contains(range.commonAncestorContainer)) return;
+        pendingRange.current = range.cloneRange();
+        activeMark.current = null;
+        openAt(range.getBoundingClientRect(), false, null);
+      }, 400);
+    };
+
+    document.addEventListener("selectionchange", onSelectionChange);
+    return () => {
+      if (timer) clearTimeout(timer);
+      document.removeEventListener("selectionchange", onSelectionChange);
+    };
+  }, [enabled, openAt]);
+
   /** Opening the toolbar over an existing highlight edits it rather than making a new one. */
   useEffect(() => {
     if (!enabled) return;

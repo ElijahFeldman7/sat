@@ -6,6 +6,8 @@ export interface MoreMenuItem {
   label: string;
   icon: React.ReactNode;
   onSelect: () => void;
+  mobileOnly?: boolean;
+  on?: boolean;
 }
 
 /**
@@ -57,17 +59,29 @@ export function MoreMenu({
         <button
           key={item.label}
           type="button"
-          role="menuitem"
+          role={item.on === undefined ? "menuitem" : "menuitemcheckbox"}
+          aria-checked={item.on}
           onClick={() => {
             item.onSelect();
-            onClose();
+            if (item.on === undefined) onClose();
           }}
-          className="flex h-[54px] w-full items-center gap-[16px] px-[22px] text-left text-[17px] text-bb-ink hover:bg-black/[0.05]"
+          className={`flex h-[54px] w-full items-center gap-[16px] px-[22px] text-left text-[17px] text-bb-ink hover:bg-black/[0.05] ${
+            item.mobileOnly ? "md:hidden" : ""
+          }`}
         >
           <span className="flex h-[24px] w-[24px] shrink-0 items-center justify-center text-bb-ink">
             {item.icon}
           </span>
-          {item.label}
+          <span className="min-w-0 flex-1 truncate">{item.label}</span>
+          {item.on !== undefined && (
+            <span
+              className={`shrink-0 rounded-full px-[10px] py-[3px] text-[13px] font-bold leading-[1.4] ${
+                item.on ? "bg-bb-ink text-white" : "border border-black/25 text-black/55"
+              }`}
+            >
+              {item.on ? "On" : "Off"}
+            </span>
+          )}
         </button>
       ))}
     </div>
