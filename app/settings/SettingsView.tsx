@@ -19,10 +19,12 @@ export function SettingsView({
   initialGoal,
   data,
   todaySeconds,
+  userCount,
 }: {
   initialGoal: number;
   data: DayDatum[];
   todaySeconds: number;
+  userCount: number | null;
 }) {
   const [goal, setGoal] = useState(initialGoal);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -124,6 +126,18 @@ export function SettingsView({
           <GoalHeatmap data={data} goalMinutes={goal} />
         </div>
       </Card>
+
+      {userCount !== null && (
+        <Card className="mt-[20px] p-[20px] md:p-[24px]">
+          <h2 className="text-[19px] font-bold text-bb-ink">Users</h2>
+          <p className="mt-[6px] text-[15px] text-black/60">
+            Total accounts registered on the platform.
+          </p>
+          <p className="mt-[14px] text-[32px] font-bold tabular-nums leading-none text-bb-ink">
+            {userCount.toLocaleString()}
+          </p>
+        </Card>
+      )}
 
       <div className="h-[40px]" />
     </div>

@@ -20,6 +20,12 @@ export async function upsertUser(u: {
   );
 }
 
+/** Total number of registered users. */
+export async function countUsers(): Promise<number> {
+  const row = await get<{ n: string }>(`SELECT COUNT(*) AS n FROM users`);
+  return Number(row?.n ?? 0);
+}
+
 // ---------------------------------------------------------------------------
 // Question selection
 // ---------------------------------------------------------------------------
