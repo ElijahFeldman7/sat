@@ -1,6 +1,6 @@
 import type { Difficulty, ModuleKey, NormalizedQuestion } from "@/lib/qbank/types";
 import { isGradable } from "@/lib/qbank/normalize";
-import { all, boolArray, get, run, sql, uuidv7 } from "./index";
+import { all, boolArray, get, ready, run, sql, uuidv7 } from "./index";
 
 // ---------------------------------------------------------------------------
 // Users
