@@ -55,14 +55,20 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   });
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return handle(async () => {
     const user = await requireUser();
     const { id } = await params;
 
-    if (!(await deleteDrillSet(id, user.id))) throw new Error("Drill set not found");
+    const body = (await req.json().catch(() => ({}))) as { day?: string };
+    const day = body.day && DAY_PATTERN.test(body.day) ? body.day : null;
 
-    return { ok: true };
+    const removed = await deleteDrillSet(id, user.id, day);
+    if (!removed) throw new Error("Drill set not found");
+
+    return { ok: true, ...removed };
   });
 }
 

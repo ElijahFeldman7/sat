@@ -3,13 +3,23 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MoreIcon } from "@/components/exam/icons";
+import { localDay } from "@/lib/day";
 
 /**
  * Per-row overflow menu on the history list. Delete is destructive and there is
  * no undo, so the menu asks a second time in place rather than acting on the
  * first tap.
  */
-export function SetMenu({ id, name }: { id: string; name: string }) {
+export function SetMenu({
+  id,
+  name,
+  workedAt,
+}: {
+  id: string;
+  name: string;
+  /** When the set was worked, so its minutes come off the right local day. */
+  workedAt: string;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -45,7 +55,11 @@ export function SetMenu({ id, name }: { id: string; name: string }) {
     setBusy(true);
     setError(false);
     try {
-      const res = await fetch(`/api/drills/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/drills/${id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ day: localDay(workedAt) }),
+      });
       if (!res.ok) throw new Error(await res.text());
       close();
       router.refresh();
@@ -80,7 +94,8 @@ export function SetMenu({ id, name }: { id: string; name: string }) {
           {confirming ? (
             <div className="px-[16px] py-[10px]">
               <p className="text-[15px] leading-[1.45] text-bb-ink">
-                Delete this set? Its answers and timing are removed for good.
+                Delete this set? Its answers, practice minutes, review queue and
+                highlights come off your account for good.
               </p>
               {error && (
                 <p className="mt-[8px] text-[13px] text-[#c62828]">

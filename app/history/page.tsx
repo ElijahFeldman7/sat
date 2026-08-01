@@ -79,7 +79,11 @@ export default async function HistoryPage() {
                     >
                       {done ? "Review" : "Resume"}
                     </Link>
-                    <SetMenu id={s.id} name={s.name} />
+                    <SetMenu
+                      id={s.id}
+                      name={s.name}
+                      workedAt={new Date(s.started_at ?? s.created_at).toISOString()}
+                    />
                   </div>
                 </div>
               );

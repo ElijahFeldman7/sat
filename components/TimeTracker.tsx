@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { localDay } from "@/lib/day";
 
 /** How often active time is added up. Bounds how much idle time can slip in. */
 const TICK_MS = 10_000;
@@ -23,14 +24,6 @@ const ACTIVITY_EVENTS = [
   "touchstart",
   "pointerdown",
 ] as const;
-
-/** Local calendar day, so buckets match the calendar the student sees. */
-function localDay(at: number): string {
-  const d = new Date(at);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate(),
-  ).padStart(2, "0")}`;
-}
 
 /**
  * Records *active* time on the platform.

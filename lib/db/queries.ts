@@ -569,12 +569,91 @@ export async function saveProgress(setId: string, patches: ProgressPatch[]) {
   `;
 }
 
-export async function deleteDrillSet(setId: string, userId: string): Promise<boolean> {
-  const rows = await all<{ id: string }>(
-    "DELETE FROM drill_sets WHERE id = ?::uuid AND user_id = ? RETURNING id",
-    [setId, userId],
-  );
-  return rows.length > 0;
+export interface DeletedSet {
+  questions: number;
+  /** Review-queue entries dropped because no other set covers those questions. */
+  srsEntries: number;
+  /** Highlights and notes dropped on the same rule. */
+  annotations: number;
+  /** Practice seconds subtracted from the day the set was worked. */
+  seconds: number;
+}
+
+/**
+ * Deletes a set and everything downstream of it, in one transaction.
+ *
+ * Scoped by user throughout, so an id guessed from someone else's URL touches
+ * nothing; returns null when nothing matched. `drill_questions` goes by cascade.
+ * Review scheduling and annotations are keyed by question rather than by set, so
+ * they are only dropped for questions no *remaining* set of this user covers —
+ * a question you have also practised elsewhere keeps its box and its highlights.
+ *
+ * `day` is the student's local day the set was worked, which only the browser
+ * can compute (see `localDay`). Given one, the set's recorded time is subtracted
+ * from that day's total. It is an approximation in both directions: `daily_time`
+ * counts idle-gated wall-clock time across the whole app, not per-set time, and
+ * a set worked across midnight lands entirely on one day. Clamped at zero so it
+ * can never push a day negative.
+ */
+export async function deleteDrillSet(
+  setId: string,
+  userId: string,
+  day?: string | null,
+): Promise<DeletedSet | null> {
+  await ready();
+
+  return sql().begin(async (tx) => {
+    const [set] = await tx<{ id: string }[]>`
+      SELECT id FROM drill_sets WHERE id = ${setId}::uuid AND user_id = ${userId}
+    `;
+    if (!set) return null;
+
+    const rows = await tx<{ question_key: string; time_spent_ms: number }[]>`
+      SELECT question_key, time_spent_ms FROM drill_questions WHERE set_id = ${setId}::uuid
+    `;
+    const keys = rows.map((r) => r.question_key);
+    const seconds = Math.round(rows.reduce((sum, r) => sum + r.time_spent_ms, 0) / 1000);
+
+    // First, so the "no remaining set" checks below see the world without it.
+    await tx`DELETE FROM drill_sets WHERE id = ${setId}::uuid AND user_id = ${userId}`;
+
+    let srsEntries = 0;
+    let annotations = 0;
+    if (keys.length > 0) {
+      const orphaned = await tx<{ question_key: string }[]>`
+        SELECT k AS question_key FROM UNNEST(${keys}::text[]) AS k
+        WHERE k NOT IN (
+          SELECT dq.question_key FROM drill_questions dq
+          JOIN drill_sets ds ON ds.id = dq.set_id
+          WHERE ds.user_id = ${userId}
+        )
+      `;
+      const orphanKeys = orphaned.map((r) => r.question_key);
+
+      if (orphanKeys.length > 0) {
+        const dropped = await tx`
+          DELETE FROM srs_queue
+          WHERE user_id = ${userId} AND question_key = ANY(${orphanKeys}::text[])
+        `;
+        srsEntries = dropped.count;
+
+        const notes = await tx`
+          DELETE FROM annotations
+          WHERE user_id = ${userId} AND question_key = ANY(${orphanKeys}::text[])
+        `;
+        annotations = notes.count;
+      }
+    }
+
+    if (day && seconds > 0) {
+      await tx`
+        UPDATE daily_time SET seconds = GREATEST(0, seconds - ${seconds})
+        WHERE user_id = ${userId} AND day = ${day}::date
+      `;
+    }
+
+    return { questions: keys.length, srsEntries, annotations, seconds };
+  });
 }
 
 export async function markStarted(setId: string) {
