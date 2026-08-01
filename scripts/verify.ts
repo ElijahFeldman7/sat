@@ -6,7 +6,7 @@
  * may be one that is currently in use on a real exam.
  */
 import { all, close, get } from "@/lib/db/index";
-import { syncCatalog } from "@/lib/db/sync";
+import { getCatalog, syncCatalog } from "@/lib/db/sync";
 import {
   countAvailable,
   getDrillQuestions,
@@ -50,6 +50,42 @@ async function main() {
   }
   check("live items were flagged", totals.every((r) => Number(r.live) > 0));
   check("usable pool remains", totals.every((r) => Number(r.n) - Number(r.live) > 50));
+
+  // Topics are grouped by skill name, so a name the bank spells two ways
+  // silently splits one topic into two partial ones. Every stored name must be
+  // a name the lookup catalog uses, exactly.
+  const catalog = await getCatalog();
+  const catalogNames = new Set(
+    (["math", "rw"] as ModuleKey[]).flatMap((m) =>
+      catalog.domains[m].flatMap((d) => [d.name, ...d.skills.map((s) => s.name)]),
+    ),
+  );
+  const storedNames = await all<{ module: string; domain_name: string; skill_name: string }>(
+    "SELECT DISTINCT module, domain_name, skill_name FROM questions",
+  );
+  const offNames = storedNames
+    .flatMap((r) => [r.domain_name, r.skill_name])
+    .filter((n) => !catalogNames.has(n));
+  check(
+    "every domain/skill name matches the lookup catalog",
+    offNames.length === 0,
+    offNames.length ? [...new Set(offNames)].map((n) => JSON.stringify(n)).join(", ") : "",
+  );
+
+  const skillCounts = await all<{ module: string; n: string }>(
+    "SELECT module, COUNT(DISTINCT skill_name) AS n FROM questions GROUP BY module ORDER BY module",
+  );
+  const expected = Object.fromEntries(
+    (["math", "rw"] as ModuleKey[]).map((m) => [
+      m,
+      catalog.domains[m].reduce((sum, d) => sum + d.skills.length, 0),
+    ]),
+  );
+  check(
+    "no skill split across spellings",
+    skillCounts.every((r) => Number(r.n) === expected[r.module]),
+    skillCounts.map((r) => `${r.module}=${r.n}/${expected[r.module]}`).join(" "),
+  );
 
   section("2. Live-item guard");
   const live = Number(

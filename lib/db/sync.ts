@@ -1,5 +1,5 @@
 import { fetchCatalog, fetchQuestionList } from "@/lib/qbank/client";
-import { ASSESSMENTS, type Catalog, type ModuleKey } from "@/lib/qbank/types";
+import { ASSESSMENTS, type Catalog, type Domain, type ModuleKey } from "@/lib/qbank/types";
 import { all, boolArray, get, ready, run, sql, tsArray } from "./index";
 
 const STALE_MS = 24 * 60 * 60 * 1000;
@@ -43,6 +43,31 @@ interface QuestionRowInput {
   source: string;
   createdDate: Date | null;
   updatedDate: Date | null;
+}
+
+/** Case- and whitespace-insensitive form, for matching names across endpoints. */
+const nameKey = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();
+
+/**
+ * Resolves a domain or skill name from `get-questions` back to the spelling the
+ * lookup catalog uses.
+ *
+ * The bank is not self-consistent about these strings. `get-questions` returns
+ * both "Cross-Text Connections" (159 rows) and "Cross-text Connections" (6),
+ * and gives three math skills a trailing space that lookup does not
+ * ("Inference from sample statistics and margin of error "). Since topics are
+ * grouped by name, each variant became its own topic holding a slice of the
+ * pool — a drill offering 1 Cross-text question while 39 sat under the other
+ * spelling. Lookup is the authority: it is what the educator site labels its
+ * own filters with.
+ */
+function canonicalNamer(domains: Domain[]): (raw: string) => string {
+  const byKey = new Map<string, string>();
+  for (const domain of domains) {
+    byKey.set(nameKey(domain.name), domain.name);
+    for (const skill of domain.skills) byKey.set(nameKey(skill.name), skill.name);
+  }
+  return (raw) => byKey.get(nameKey(raw)) ?? raw.trim().replace(/\s+/g, " ");
 }
 
 /** Bulk upsert via UNNEST — one statement per chunk. */
@@ -122,6 +147,7 @@ export async function syncCatalog(
         domains.map((d) => d.code),
       );
       const live = catalog.liveItems[moduleKey];
+      const canonical = canonicalNamer(domains);
 
       const rows: QuestionRowInput[] = [];
       const seen = new Set<string>();
@@ -143,12 +169,8 @@ export async function syncCatalog(
           uid: q.uId ?? null,
           questionId: q.questionId ?? null,
           domainCode: q.primary_class_cd.trim(),
-          // get-questions ships three math skills with a trailing space
-          // ("Inference from sample statistics and margin of error ") that the
-          // lookup endpoint does not. The educator site trims before matching
-          // skills; so must we, or those topics look like distinct skills.
-          domainName: q.primary_class_cd_desc.trim(),
-          skillName: q.skill_desc.trim(),
+          domainName: canonical(q.primary_class_cd_desc),
+          skillName: canonical(q.skill_desc),
           difficulty: q.difficulty,
           scoreBand: q.score_band_range_cd ?? null,
           isLive: !!externalId && live.has(externalId),
