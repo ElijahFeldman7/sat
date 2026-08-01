@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { MODULES } from "@/lib/qbank/types";
 import { ChoiceList } from "./ChoiceList";
-import { DesmosPanel, loadDesmosWidth } from "./DesmosPanel";
+import { DEFAULT_DESMOS_WIDTH, DesmosPanel, loadDesmosWidth } from "./DesmosPanel";
 import { ExamFooter } from "./ExamFooter";
 import { ExamBanner } from "./ExamBanner";
 import { ExamHeader } from "./ExamHeader";
@@ -56,7 +56,6 @@ export function ExamShell({
   const [highlightsOn, setHighlightsOn] = useState(false);
   const [clockHidden, setClockHidden] = useState(false);
   const [calcOpen, setCalcOpen] = useState(false);
-  const [calcWidth, setCalcWidth] = useState(560);
   const [showDirections, setShowDirections] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -66,9 +65,20 @@ export function ExamShell({
   const current = questions[currentIdx];
   const total = questions.length;
 
-  useEffect(() => {
-    setCalcWidth(loadDesmosWidth());
-  }, []);
+  /**
+   * The saved calculator width lives in localStorage, so the server and the
+   * first client render have to agree on the default or hydration mismatches.
+   * `useSyncExternalStore` hands React the server value while hydrating and the
+   * stored one immediately after — no effect, and no cascading render. Dragging
+   * takes over from then on; DesmosPanel writes the new width back itself.
+   */
+  const storedCalcWidth = useSyncExternalStore(
+    () => () => {},
+    loadDesmosWidth,
+    () => DEFAULT_DESMOS_WIDTH,
+  );
+  const [draggedCalcWidth, setDraggedCalcWidth] = useState<number | null>(null);
+  const calcWidth = draggedCalcWidth ?? storedCalcWidth;
 
   const [stopwatch, setStopwatch] = useState(() => ({
     startedAt: Date.now(),
@@ -405,7 +415,7 @@ export function ExamShell({
           <DesmosPanel
             open={calcOpen}
             width={calcWidth}
-            onWidthChange={setCalcWidth}
+            onWidthChange={setDraggedCalcWidth}
             onClose={() => setCalcOpen(false)}
           />
         )}

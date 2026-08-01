@@ -34,6 +34,10 @@ export function ChoiceList({
         const isCorrect = reveal && correctIds?.includes(opt.id);
         const isWrongPick = reveal && isSelected && !isCorrect;
 
+        // Crossed-out choices and the read-only results view do nothing when
+        // clicked, so neither should advertise a click.
+        const interactive = !reveal && !isCrossed;
+
         let borderClass = "border-bb-border";
         let ring = "";
         if (isCorrect) {
@@ -45,15 +49,20 @@ export function ChoiceList({
         } else if (isSelected) {
           borderClass = "border-bb-blue";
           ring = "shadow-[inset_0_0_0_1px_var(--color-bb-blue)]";
+        } else if (isCrossed) {
+          borderClass = "border-black/20";
         }
 
         return (
-          <div key={opt.id} className="flex items-start gap-[16px]">
+          <div key={opt.id} className="flex items-stretch gap-[16px]">
             <button
               type="button"
               onClick={() => onSelect(opt.id)}
-              className={`flex min-h-[46px] flex-1 items-center gap-[16px] rounded-[8px] border bg-white px-[13px] py-[9px] text-left transition-[border-color,box-shadow] duration-75 ${borderClass} ${ring} ${
-                isCrossed ? "opacity-45" : "hover:border-bb-ink"
+              // A stray pixel of drag across selectable text cancels the click,
+              // which is why only the letter felt reliable. Nothing here is
+              // worth selecting mid-exam, and images must not start a drag.
+              className={`relative flex min-h-[46px] flex-1 items-center gap-[16px] rounded-[8px] border bg-white px-[13px] py-[9px] text-left transition-[border-color,box-shadow,background-color] duration-75 [&_img]:pointer-events-none ${borderClass} ${ring} ${
+                interactive ? "select-none hover:border-bb-ink hover:bg-[#f0f0f0]" : ""
               }`}
             >
               <span
@@ -65,19 +74,26 @@ export function ChoiceList({
                       : isSelected
                         ? "border-bb-blue bg-bb-blue text-white"
                         : "border-bb-ink text-bb-ink"
-                }`}
+                } ${isCrossed ? "opacity-40" : ""}`}
               >
                 {opt.letter}
               </span>
-              <span className={`flex-1 ${isCrossed ? "line-through decoration-bb-ink" : ""}`}>
+              <span className={`flex-1 ${isCrossed ? "opacity-40" : ""}`}>
                 <QuestionHtmlInline html={opt.html} />
               </span>
+
+              {/* One rule straight across the whole box, edge to edge — not a
+                  text-decoration, which would stop at the end of the words and
+                  fade along with them. */}
+              {isCrossed && (
+                <span className="pointer-events-none absolute inset-x-0 top-1/2 h-[1.5px] -translate-y-1/2 bg-bb-ink" />
+              )}
             </button>
 
             {/* Cross-out gutter. Once a choice is struck through, the control
                 stops offering the action and becomes the way back out of it —
                 so it reads "Undo" rather than a struck letter. */}
-            <span className="flex h-[46px] w-[46px] shrink-0 items-center justify-center">
+            <span className="flex w-[46px] shrink-0 items-center justify-center">
               {crossOutMode &&
                 (isCrossed ? (
                   <button
