@@ -1,0 +1,84 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1200px; height: 630px; }
+      body {
+        background: #1c2260;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        color: #fff;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 0 78px;
+        position: relative;
+        overflow: hidden;
+      }
+      /* Soft brand glow so the card isn't a flat rectangle */
+      body::before {
+        content: "";
+        position: absolute;
+        width: 900px; height: 900px;
+        right: -320px; top: -380px;
+        background: radial-gradient(circle, rgba(56,76,192,.85) 0%, rgba(56,76,192,0) 68%);
+      }
+      .row { display: flex; align-items: center; gap: 26px; position: relative; }
+      .plaque {
+        width: 108px; height: 108px; border-radius: 25px;
+        background: #384cc0; display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 10px 34px rgba(0,0,0,.32);
+        flex-shrink: 0;
+      }
+      h1 { font-size: 82px; font-weight: 800; letter-spacing: -.03em; line-height: 1; }
+      .tagline {
+        position: relative;
+        margin-top: 34px;
+        font-size: 41px; font-weight: 500; letter-spacing: -.015em;
+        color: rgba(255,255,255,.9);
+      }
+      .rule {
+        position: relative;
+        margin: 40px 0 30px;
+        height: 4px; width: 260px;
+        background: repeating-linear-gradient(to right, #fff 0 22px, transparent 22px 34px);
+      }
+      .facts { position: relative; display: flex; gap: 40px; font-size: 25px; color: rgba(255,255,255,.72); }
+      .facts span { display: flex; align-items: center; gap: 12px; }
+      .dot { width: 9px; height: 9px; border-radius: 50%; background: #7c8ce8; }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <div class="plaque">
+        <svg viewBox="0 0 96 96" width="108" height="108">
+          <g fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"
+             transform="translate(15 30) scale(0.5)">
+            <path d="M33 13.5C33 7.5 27 4 19.5 4S6 7.5 6 13.5s6 8.5 13.5 10.5S33 28.5 33 34.5 27 44 19.5 44 6 40.5 6 34.5"/>
+            <path d="M46 44 61 4l15 40"/>
+            <path d="M51.5 33h19"/>
+            <path d="M88 4.5h36"/>
+            <path d="M106 4.5V44"/>
+          </g>
+          <g fill="#fff" opacity=".9">
+            <rect x="24.5" y="62" width="13" height="4" rx="2"/>
+            <rect x="41.5" y="62" width="13" height="4" rx="2"/>
+            <rect x="58.5" y="62" width="13" height="4" rx="2"/>
+          </g>
+        </svg>
+      </div>
+      <h1>SAT Drill</h1>
+    </div>
+
+    <div class="tagline">Practice like it&rsquo;s test day.</div>
+
+    <div class="rule"></div>
+
+    <div class="facts">
+      <span><i class="dot"></i>Real College Board questions</span>
+      <span><i class="dot"></i>Bluebook interface</span>
+      <span><i class="dot"></i>Live items excluded</span>
+    </div>
+  </body>
+</html>
