@@ -2,18 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { DIFFICULTY_LABELS, MODULES } from "@/lib/qbank/types";
+import { MODULES } from "@/lib/qbank/types";
 import { ChoiceList } from "./ChoiceList";
 import { DesmosPanel, loadDesmosWidth } from "./DesmosPanel";
 import { ExamFooter } from "./ExamFooter";
 import { ExamBanner } from "./ExamBanner";
 import { ExamHeader } from "./ExamHeader";
+import type { MoreMenuItem } from "./MoreMenu";
+import { EraserIcon, ExitIcon, HelpIcon, KeyboardIcon, ListIcon } from "./icons";
 import { QuestionHeader } from "./QuestionHeader";
 import { QuestionHtml } from "./QuestionHtml";
 import { QuestionNavPopover, toNavItems } from "./QuestionNav";
 import { ReviewPage } from "./ReviewPage";
 import { SplitPane } from "./SplitPane";
 import { SprInput } from "./SprInput";
+import { HighlightToolbar } from "./HighlightToolbar";
 import { useHighlighter } from "./useHighlighter";
 import type { ExamPayload, ExamQuestionState } from "./types";
 
@@ -56,6 +59,7 @@ export function ExamShell({
   const [calcWidth, setCalcWidth] = useState(560);
   const [showDirections, setShowDirections] = useState(false);
   const [showMore, setShowMore] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
@@ -260,7 +264,17 @@ export function ExamShell({
   }, [currentIdx, goTo, onReviewPage, total]);
 
   // ---------------------------------------------------------------- highlights
-  const { stimulusRef, highlightHtml, onMouseUp, clearHighlights } = useHighlighter({
+  const {
+    stimulusRef,
+    highlightHtml,
+    onMouseUp,
+    clearHighlights,
+    toolbar,
+    closeToolbar,
+    applyStyle,
+    removeAtSelection,
+    setNote,
+  } = useHighlighter({
     enabled: highlightsOn,
     questionKey: current?.key ?? "",
     initial: initialHighlights,
@@ -302,6 +316,7 @@ export function ExamShell({
         setNavOpen(false);
         setShowDirections(false);
         setShowMore(false);
+        setShowShortcuts(false);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -311,19 +326,54 @@ export function ExamShell({
   const navItems = useMemo(() => toNavItems(questions), [questions]);
   const sectionTitle = `Section 1: ${MODULES[set.module].name} Questions`;
 
-  const bannerText = [
-    set.kind === "srs" ? "Review misses" : set.kind === "adaptive" ? "Weak spots" : "Practice drill",
-    set.name,
-    set.config.difficulties?.length
-      ? set.config.difficulties.map((d) => DIFFICULTY_LABELS[d]).join(" + ")
-      : null,
-    current ? current.skill : null,
-  ]
-    .filter(Boolean)
-    .join("  ·  ");
+  // Bluebook's banner is a single short label, not a breadcrumb — the drill's
+  // topics and difficulty already live on the results and history pages.
+  const bannerText =
+    set.kind === "srs"
+      ? "Review Misses"
+      : set.kind === "adaptive"
+        ? "Weak Spots"
+        : "Practice Drill";
 
   const body = current?.body;
   const hasStimulus = !!body?.stimulus?.trim();
+
+  const moreItems = useMemo<MoreMenuItem[]>(
+    () => [
+      {
+        label: "Help",
+        icon: <HelpIcon className="h-[22px] w-[22px]" />,
+        onSelect: () => setShowDirections(true),
+      },
+      {
+        label: "Shortcuts",
+        icon: <KeyboardIcon className="h-[22px] w-[22px]" />,
+        onSelect: () => setShowShortcuts(true),
+      },
+      {
+        label: "Clear Highlights",
+        icon: <EraserIcon className="h-[22px] w-[22px]" />,
+        onSelect: clearHighlights,
+      },
+      {
+        label: "Review Page",
+        icon: <ListIcon className="h-[22px] w-[22px]" />,
+        onSelect: () => {
+          commitTime();
+          setOnReviewPage(true);
+        },
+      },
+      {
+        label: "Exit the Exam",
+        icon: <ExitIcon className="h-[22px] w-[22px]" />,
+        onSelect: () => {
+          commitTime();
+          router.push("/dashboard");
+        },
+      },
+    ],
+    [clearHighlights, commitTime, router],
+  );
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -343,7 +393,9 @@ export function ExamShell({
         onToggleDirections={() => setShowDirections((v) => !v)}
         highlightsOn={highlightsOn}
         onToggleHighlights={() => setHighlightsOn((v) => !v)}
-        onMore={() => setShowMore((v) => !v)}
+        moreOpen={showMore}
+        onToggleMore={() => setShowMore((v) => !v)}
+        moreItems={moreItems}
       />
 
       <ExamBanner text={bannerText} />
@@ -459,39 +511,33 @@ export function ExamShell({
         </Modal>
       )}
 
-      {showMore && (
-        <Modal title="More" onClose={() => setShowMore(false)}>
-          <ul className="space-y-[10px] text-[16px]">
-            <li>
-              <button
-                type="button"
-                className="text-bb-blue hover:underline"
-                onClick={() => {
-                  clearHighlights();
-                  setShowMore(false);
-                }}
-              >
-                Clear highlights on this passage
-              </button>
-            </li>
-            <li>
-              <button
-                type="button"
-                className="text-bb-blue hover:underline"
-                onClick={() => {
-                  commitTime();
-                  setOnReviewPage(true);
-                  setShowMore(false);
-                }}
-              >
-                Go to review page
-              </button>
-            </li>
-            <li className="pt-[8px] text-[14px] text-black/60">
-              Shortcuts: A–D select · ← / → navigate · M mark · C cross out · H highlight
-              {isMath && " · K calculator"}
-            </li>
-          </ul>
+      {toolbar && (
+        <HighlightToolbar
+          state={toolbar}
+          onApply={applyStyle}
+          onRemove={removeAtSelection}
+          onNote={setNote}
+          onClose={closeToolbar}
+        />
+      )}
+
+      {showShortcuts && (
+        <Modal title="Shortcuts" onClose={() => setShowShortcuts(false)}>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-[18px] gap-y-[10px] text-[16px]">
+            {[
+              ["A – D", "Select an answer choice"],
+              ["← / →", "Previous / next question"],
+              ["M", "Mark for review"],
+              ["C", "Cross out answers"],
+              ["H", "Highlights & notes"],
+              ...(isMath ? [["K", "Calculator"]] : []),
+            ].map(([keys, what]) => (
+              <div key={keys} className="contents">
+                <dt className="whitespace-nowrap font-bold tabular-nums text-bb-ink">{keys}</dt>
+                <dd className="text-black/70">{what}</dd>
+              </div>
+            ))}
+          </dl>
         </Modal>
       )}
     </div>

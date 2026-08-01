@@ -39,8 +39,8 @@ export function TimingModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6">
-      <div className="bb-pop w-full max-w-[560px] rounded-[10px] bg-white p-[30px] shadow-[0_10px_50px_rgba(0,0,0,0.3)]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/30 p-[16px] md:p-6">
+      <div className="bb-pop my-auto w-full max-w-[560px] rounded-[10px] bg-white p-[20px] shadow-[0_10px_50px_rgba(0,0,0,0.3)] md:p-[30px]">
         <h2 className="text-[24px] font-bold leading-[1.2] text-bb-ink">Set your pacing</h2>
         <p className="mt-[6px] text-[15px] text-black/55">
           {count} question{count === 1 ? "" : "s"}

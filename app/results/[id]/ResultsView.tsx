@@ -81,10 +81,10 @@ export function ResultsView({
   const allRevealed = revealed.size === questions.length;
 
   return (
-    <div className="mx-auto w-full max-w-[1000px] px-[40px] py-[34px]">
+    <div className="mx-auto w-full max-w-[1000px] px-[20px] py-[24px] md:px-[40px] md:py-[34px]">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-[32px] font-bold leading-[1.15] tracking-[-0.02em] text-bb-ink">
+          <h1 className="text-[24px] font-bold leading-[1.15] tracking-[-0.02em] text-bb-ink md:text-[32px]">
             {name}
           </h1>
           <p className="mt-[6px] text-[16px] text-black/55">
@@ -93,7 +93,7 @@ export function ResultsView({
           </p>
         </div>
         <div className="text-right">
-          <div className="text-[42px] font-bold leading-none tabular-nums text-bb-ink">
+          <div className="text-[34px] font-bold leading-none tabular-nums text-bb-ink md:text-[42px]">
             {correct}
             <span className="text-black/35">/{total}</span>
           </div>
@@ -102,7 +102,7 @@ export function ResultsView({
       </div>
 
       {/* Per-skill breakdown */}
-      <Card className="mt-[24px] p-[24px]">
+      <Card className="mt-[24px] p-[18px] md:p-[24px]">
         <h2 className="text-[19px] font-bold text-bb-ink">By topic</h2>
         <ul className="mt-[14px] space-y-[11px]">
           {bySkill.map(([skill, s]) => {
@@ -110,7 +110,7 @@ export function ResultsView({
             return (
               <li key={skill} className="flex items-center gap-[14px]">
                 <span className="min-w-0 flex-1 truncate text-[15px] text-bb-ink">{skill}</span>
-                <span className="h-[7px] w-[180px] overflow-hidden rounded-full bg-black/10">
+                <span className="hidden h-[7px] w-[120px] overflow-hidden rounded-full bg-black/10 sm:block lg:w-[180px]">
                   <span
                     className="block h-full rounded-full"
                     style={{
@@ -129,7 +129,7 @@ export function ResultsView({
       </Card>
 
       {flagged.length > 0 && (
-        <Card className="mt-[20px] p-[24px]">
+        <Card className="mt-[20px] p-[18px] md:p-[24px]">
           <h2 className="text-[19px] font-bold text-bb-ink">Pacing flags</h2>
           <ul className="mt-[12px] space-y-[8px] text-[15px]">
             {flagged.map((q) => (

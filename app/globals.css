@@ -15,9 +15,16 @@
   --color-bb-navy: #1c2260; /* banner */
   --color-bb-review: #a12b2b; /* "For Review" flag */
 
+  /*
+   * Roboto and Noto Serif are what College Board itself ships (Apricot design
+   * system; the question card is set in Noto Serif). Both are self-hosted by
+   * next/font — the fallbacks only apply while the face is loading.
+   */
   --font-bb-sans:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-bb-serif: Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
+    var(--font-roboto), -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial,
+    sans-serif;
+  --font-bb-serif:
+    var(--font-noto-serif), Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
 }
 
 :root {
@@ -60,8 +67,13 @@ body {
 
 .qbank {
   font-family: var(--font-bb-serif);
-  font-size: 19px;
-  line-height: 1.55;
+  /*
+   * 16px / 23px. Measured off the Bluebook screenshots: passage lines sit on a
+   * 23px baseline pitch with ~15px of ink per line, which is Noto Serif at
+   * 16px — the previous 19px/1.55 ran a third larger than the real exam.
+   */
+  font-size: 16px;
+  line-height: 1.44;
   color: #000;
 }
 
@@ -123,7 +135,7 @@ body {
 .qbank table {
   border-collapse: collapse;
   margin: 0 auto;
-  font-size: 17px;
+  font-size: 15px;
 }
 
 .qbank th,
@@ -169,11 +181,34 @@ body {
   font-style: italic;
 }
 
-/* Passage highlights */
+/*
+ * Passage highlights. The colour rides on `data-hl` so the persisted markup
+ * carries the student's choice; marks saved before colours existed have no
+ * attribute and fall back to yellow.
+ */
 .qbank mark.bb-hl {
-  background: #ffe484;
+  background: #fdf0b4;
   padding: 0.05em 0;
   border-radius: 2px;
+}
+
+.qbank mark.bb-hl[data-hl="blue"] {
+  background: #d8e8f8;
+}
+
+.qbank mark.bb-hl[data-hl="pink"] {
+  background: #f9d3e6;
+}
+
+.qbank mark.bb-hl[data-hl="underline"] {
+  background: transparent;
+  border-bottom: 2px solid var(--color-bb-ink);
+}
+
+/* A note is invisible on its own, so annotated marks get a dog-ear. */
+.qbank mark.bb-hl[data-note] {
+  border-bottom: 2px dotted var(--color-bb-blue);
+  cursor: help;
 }
 
 /* Scrollbars inside exam panes stay out of the way until hovered. */

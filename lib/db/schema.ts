@@ -7,6 +7,19 @@
  *
  * Every statement is idempotent.
  */
+
+/**
+ * Bump on every change to SCHEMA_SQL.
+ *
+ * `ready()` skips the DDL when the database already records this version, so a
+ * new table that arrives without a bump is never created on a database that
+ * already exists.
+ *
+ * 1 — initial schema
+ * 2 — user_settings, daily_time (daily goal + time on platform)
+ */
+export const SCHEMA_VERSION = 2;
+
 export const SCHEMA_SQL = String.raw`
 -- Schema for the SAT drill app.
 --
@@ -146,6 +159,36 @@ create table if not exists sat.sync_state (
   synced_at timestamptz not null
 );
 
+-- Which revision of this file the database has had applied. The single-row
+-- constraint keeps it honest: there is one schema, so there is one version.
+create table if not exists sat.schema_version (
+  only_row   boolean primary key default true check (only_row),
+  version    integer not null,
+  applied_at timestamptz not null default now()
+);
+
+-- Per-user preferences. One row per user, created on first read.
+create table if not exists sat.user_settings (
+  user_id            text primary key references sat.users(id) on delete cascade,
+  -- Daily practice target, in minutes. The heatmap on /settings colours each
+  -- day by how much of this was met.
+  daily_goal_minutes integer not null default 30
+                       check (daily_goal_minutes between 5 and 240),
+  updated_at         timestamptz not null default now()
+);
+
+-- Seconds of active time on the platform, bucketed by the student's *local*
+-- day. The client sends the day key precisely because a UTC bucket would split
+-- an evening session in two for anyone west of Greenwich.
+create table if not exists sat.daily_time (
+  user_id text not null references sat.users(id) on delete cascade,
+  day     date not null,
+  seconds integer not null default 0,
+  primary key (user_id, day)
+);
+
+create index if not exists daily_time_user_day_idx on sat.daily_time (user_id, day desc);
+
 -- ---------------------------------------------------------------------------
 -- Defence in depth: no policies means no rows for anon/authenticated, while
 -- the owner role the app connects as bypasses RLS.
@@ -158,4 +201,7 @@ alter table sat.drill_questions  enable row level security;
 alter table sat.srs_queue        enable row level security;
 alter table sat.annotations      enable row level security;
 alter table sat.sync_state       enable row level security;
+alter table sat.schema_version   enable row level security;
+alter table sat.user_settings    enable row level security;
+alter table sat.daily_time       enable row level security;
 `;

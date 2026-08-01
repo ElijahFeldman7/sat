@@ -166,3 +166,81 @@ export function CloseIcon({ className = "" }: { className?: string }) {
     </svg>
   );
 }
+
+/* ---------------------------------------------------------------- */
+/* More-menu glyphs — outline, 24px grid, matching the header icons.  */
+/* ---------------------------------------------------------------- */
+
+const stroke = {
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.7,
+  strokeLinecap: "round",
+  strokeLinejoin: "round",
+} as const;
+
+export function HelpIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <g {...stroke}>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M9.4 9.2a2.7 2.7 0 1 1 3.4 2.6c-.6.2-.9.7-.9 1.3v.6" />
+      </g>
+      <circle cx="12" cy="16.8" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function KeyboardIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <g {...stroke}>
+        <rect x="2.5" y="6" width="19" height="12" rx="2" />
+        <path d="M8 15h8" />
+      </g>
+      <g fill="currentColor">
+        <circle cx="6" cy="9.5" r="0.9" />
+        <circle cx="9.4" cy="9.5" r="0.9" />
+        <circle cx="12.8" cy="9.5" r="0.9" />
+        <circle cx="16.2" cy="9.5" r="0.9" />
+        <circle cx="6" cy="12.5" r="0.9" />
+        <circle cx="18" cy="9.5" r="0.9" />
+      </g>
+    </svg>
+  );
+}
+
+export function EraserIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <g {...stroke}>
+        <path d="M8.6 19.5 3.9 14.8a1.6 1.6 0 0 1 0-2.3l8-8a1.6 1.6 0 0 1 2.3 0l5.1 5.1a1.6 1.6 0 0 1 0 2.3l-7.6 7.6z" />
+        <path d="M7.9 8.6 15.4 16" />
+        <path d="M9 19.5h11" />
+      </g>
+    </svg>
+  );
+}
+
+export function ListIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <g {...stroke}>
+        <path d="M9 7h11M9 12h11M9 17h11" />
+        <path d="M4.5 7h.01M4.5 12h.01M4.5 17h.01" />
+      </g>
+    </svg>
+  );
+}
+
+export function ExitIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <g {...stroke}>
+        <path d="M12 4.3 2.8 20.2h18.4z" />
+        <path d="M12 10v4.2" />
+      </g>
+      <circle cx="12" cy="17.3" r="1" fill="currentColor" />
+    </svg>
+  );
+}

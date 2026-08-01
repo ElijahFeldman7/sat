@@ -9,17 +9,17 @@ export default async function LandingPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="bb-dash-b flex h-[78px] shrink-0 items-center bg-bb-band pl-[43px]">
+      <header className="bb-dash-b flex h-[58px] shrink-0 items-center bg-bb-band pl-[20px] md:h-[78px] md:pl-[43px]">
         <LogoLockup />
       </header>
 
       <main className="flex flex-1 items-center justify-center px-6">
         <div className="w-full max-w-[520px] text-center">
-          <SatBadge className="mx-auto mb-[28px] h-[76px] w-[76px]" />
-          <h2 className="text-[42px] font-bold leading-[1.12] tracking-[-0.02em] text-bb-ink">
+          <SatBadge className="mx-auto mb-[22px] h-[60px] w-[60px] sm:mb-[28px] sm:h-[76px] sm:w-[76px]" />
+          <h2 className="text-[30px] font-bold leading-[1.12] tracking-[-0.02em] text-bb-ink sm:text-[42px]">
             Practice like it&rsquo;s test day.
           </h2>
-          <p className="mx-auto mt-[20px] max-w-[430px] text-[18px] leading-[1.55] text-black/70">
+          <p className="mx-auto mt-[16px] max-w-[430px] text-[16px] leading-[1.55] text-black/70 sm:mt-[20px] sm:text-[18px]">
             Build targeted drills from the real College Board question bank, in an exam interface
             that matches Bluebook. Active test questions are always excluded.
           </p>

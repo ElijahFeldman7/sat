@@ -29,6 +29,11 @@ The schema is created automatically on first query. Everything lives in a `sat`
 schema that is not exposed to the Supabase Data API, with RLS enabled on every
 table as defence in depth.
 
+**Bump `SCHEMA_VERSION` in `lib/db/schema.ts` whenever you add to `SCHEMA_SQL`.**
+`ready()` compares it against the version recorded in the database and only then
+runs the DDL — without a bump, a new table is never created on a database that
+already exists.
+
 ## Features
 
 - **Drill by topic** — any combination of the 27 skills across Math and Reading
@@ -48,6 +53,12 @@ table as defence in depth.
   (`A`–`D`, `←`/`→`, `M`, `C`, `H`, `K`).
 - **Desmos** on Math, docked in its own column so opening it shifts the exam
   rather than covering it.
+- **Daily goal** — set a practice target on `/settings` and see a calendar
+  heatmap of which days hit it. Time is counted only while the tab is visible
+  *and* you have interacted in the last two minutes, so an idle tab earns
+  nothing (`components/TimeTracker.tsx`).
+- **Mobile** — the app chrome collapses to a fixed bar with a full-screen menu,
+  and the exam stacks its two panes.
 
 ## Question sources
 
@@ -68,7 +79,8 @@ bank lists and what is counted above.
 
 ```
 lib/qbank/        TypeScript port of the College Board client, normalizer, grader
-lib/db/           schema.sql, Postgres client, every query, catalog sync
+lib/db/           schema, Postgres client, every query, catalog sync
+components/       app chrome — AppShell/AppNav, TimeTracker
 components/exam/  the Bluebook replica
 app/              routes and API handlers
 scripts/          verify.ts (end-to-end checks), backfill.ts, shoot.mjs, dev-session.ts

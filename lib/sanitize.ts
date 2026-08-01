@@ -9,7 +9,8 @@ export function sanitizeQuestionHtml(html: string | null | undefined): string {
   if (!html) return "";
   return DOMPurify.sanitize(html, {
     USE_PROFILES: { html: true, mathMl: true, svg: true },
-    ADD_ATTR: ["align", "border", "scope", "colspan", "rowspan", "alttext", "role"],
+    // data-hl / data-note carry the student's highlight colour and note.
+    ADD_ATTR: ["align", "border", "scope", "colspan", "rowspan", "alttext", "role", "data-hl", "data-note"],
     ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|data):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
   });
 }

@@ -74,22 +74,31 @@ export function ChoiceList({
               </span>
             </button>
 
-            <span className="flex h-[46px] w-[30px] shrink-0 items-center justify-center">
-              {crossOutMode && (
-                <button
-                  type="button"
-                  onClick={() => onToggleCrossOut(opt.id)}
-                  title={isCrossed ? `Undo cross out ${opt.letter}` : `Cross out ${opt.letter}`}
-                  className={`relative flex h-[22px] w-[22px] items-center justify-center rounded-full border border-bb-ink text-[13px] font-medium leading-none text-bb-ink hover:bg-black/5 ${
-                    isCrossed ? "bg-black/5" : ""
-                  }`}
-                >
-                  {opt.letter}
-                  {!isCrossed && (
+            {/* Cross-out gutter. Once a choice is struck through, the control
+                stops offering the action and becomes the way back out of it —
+                so it reads "Undo" rather than a struck letter. */}
+            <span className="flex h-[46px] w-[46px] shrink-0 items-center justify-center">
+              {crossOutMode &&
+                (isCrossed ? (
+                  <button
+                    type="button"
+                    onClick={() => onToggleCrossOut(opt.id)}
+                    aria-label={`Undo cross out ${opt.letter}`}
+                    className="text-[14px] font-medium leading-none text-bb-ink underline underline-offset-2 hover:text-bb-blue"
+                  >
+                    Undo
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onToggleCrossOut(opt.id)}
+                    aria-label={`Cross out ${opt.letter}`}
+                    className="relative flex h-[22px] w-[22px] items-center justify-center rounded-full border border-bb-ink text-[13px] font-medium leading-none text-bb-ink hover:bg-black/5"
+                  >
+                    {opt.letter}
                     <span className="absolute left-[-2px] right-[-2px] top-1/2 h-[1.5px] -translate-y-1/2 bg-bb-ink" />
-                  )}
-                </button>
-              )}
+                  </button>
+                ))}
             </span>
           </div>
         );

@@ -780,3 +780,68 @@ export async function getHighlights(
   );
   return Object.fromEntries(rows.map((r) => [r.question_key, r.payload.html]));
 }
+
+// ---------------------------------------------------------------------------
+// Settings and time on platform
+// ---------------------------------------------------------------------------
+
+export const DEFAULT_GOAL_MINUTES = 30;
+export const MIN_GOAL_MINUTES = 5;
+export const MAX_GOAL_MINUTES = 240;
+
+/** Daily practice target in minutes, falling back to the default when unset. */
+export async function getDailyGoal(userId: string): Promise<number> {
+  const row = await get<{ daily_goal_minutes: number }>(
+    "SELECT daily_goal_minutes FROM user_settings WHERE user_id = ?",
+    [userId],
+  );
+  return row?.daily_goal_minutes ?? DEFAULT_GOAL_MINUTES;
+}
+
+export async function setDailyGoal(userId: string, minutes: number): Promise<number> {
+  // Clamped rather than rejected: the column has a CHECK constraint, and a
+  // slider that snaps to the nearest legal value beats a 500.
+  const clamped = Math.min(
+    MAX_GOAL_MINUTES,
+    Math.max(MIN_GOAL_MINUTES, Math.round(minutes) || DEFAULT_GOAL_MINUTES),
+  );
+  await run(
+    `INSERT INTO user_settings (user_id, daily_goal_minutes, updated_at)
+     VALUES (?, ?, now())
+     ON CONFLICT (user_id) DO UPDATE
+       SET daily_goal_minutes = excluded.daily_goal_minutes, updated_at = now()`,
+    [userId, clamped],
+  );
+  return clamped;
+}
+
+/**
+ * Adds active seconds to a local day. `day` is the client's own YYYY-MM-DD so
+ * the buckets line up with the calendar the student is looking at.
+ */
+export async function addDailyTime(userId: string, day: string, seconds: number): Promise<void> {
+  if (seconds <= 0) return;
+  await run(
+    `INSERT INTO daily_time (user_id, day, seconds)
+     VALUES (?, ?::date, ?)
+     ON CONFLICT (user_id, day) DO UPDATE SET seconds = daily_time.seconds + excluded.seconds`,
+    [userId, day, seconds],
+  );
+}
+
+export interface DayTime {
+  day: string;
+  seconds: number;
+}
+
+/** Seconds per day over the last `days` days, most recent last. */
+export async function dailyTime(userId: string, days = 182): Promise<DayTime[]> {
+  const rows = await all<{ day: string; seconds: number }>(
+    `SELECT to_char(day, 'YYYY-MM-DD') AS day, seconds
+     FROM daily_time
+     WHERE user_id = ? AND day >= (current_date - (? || ' days')::interval)
+     ORDER BY day`,
+    [userId, days],
+  );
+  return rows.map((r) => ({ day: r.day, seconds: Number(r.seconds) }));
+}

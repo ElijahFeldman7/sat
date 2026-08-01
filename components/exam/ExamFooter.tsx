@@ -27,16 +27,16 @@ export function ExamFooter({
 }) {
   return (
     <footer className="bb-dash-t relative z-30 flex h-[60px] shrink-0 items-center bg-bb-band pt-[2px]">
-      <div className="flex w-[30%] items-center pl-[43px] text-[17px] font-bold text-bb-ink">
+      <div className="hidden w-[30%] items-center truncate pl-[43px] text-[17px] font-bold text-bb-ink md:flex">
         {userName}
       </div>
 
-      <div className="relative flex flex-1 items-center justify-center">
+      <div className="relative flex min-w-0 flex-1 items-center justify-center pl-[14px] md:pl-0">
         {children}
         <button
           type="button"
           onClick={onToggleNav}
-          className="flex h-[38px] items-center gap-[9px] rounded-[8px] bg-bb-ink px-[17px] text-[16px] font-bold leading-none text-white"
+          className="flex h-[38px] items-center gap-[9px] whitespace-nowrap rounded-[8px] bg-bb-ink px-[12px] text-[14px] font-bold leading-none text-white md:px-[17px] md:text-[16px]"
         >
           Question {current} of {total}
           <ChevronUp
@@ -45,12 +45,12 @@ export function ExamFooter({
         </button>
       </div>
 
-      <div className="flex w-[30%] items-center justify-end gap-[13px] pr-[40px]">
+      <div className="flex shrink-0 items-center justify-end gap-[8px] pr-[14px] md:w-[30%] md:gap-[13px] md:pr-[40px]">
         {showBack && (
           <button
             type="button"
             onClick={onBack}
-            className="h-[38px] rounded-full bg-bb-blue px-[26px] text-[16px] font-bold leading-none text-white hover:bg-bb-blue-hover"
+            className="h-[38px] rounded-full bg-bb-blue px-[16px] text-[15px] font-bold leading-none text-white hover:bg-bb-blue-hover md:px-[26px] md:text-[16px]"
           >
             Back
           </button>
@@ -58,7 +58,7 @@ export function ExamFooter({
         <button
           type="button"
           onClick={onNext}
-          className="h-[38px] rounded-full bg-bb-blue px-[26px] text-[16px] font-bold leading-none text-white hover:bg-bb-blue-hover"
+          className="h-[38px] rounded-full bg-bb-blue px-[16px] text-[15px] font-bold leading-none text-white hover:bg-bb-blue-hover md:px-[26px] md:text-[16px]"
         >
           {nextLabel}
         </button>

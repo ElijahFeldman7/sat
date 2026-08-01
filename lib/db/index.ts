@@ -1,5 +1,5 @@
 import postgres from "postgres";
-import { SCHEMA_SQL } from "./schema";
+import { SCHEMA_SQL, SCHEMA_VERSION } from "./schema";
 
 /**
  * Serverless platforms run many short-lived instances, each with its own pool,
@@ -65,34 +65,54 @@ const SCHEMA_LOCK = 4_820_119;
  * Applies the schema once per process.
  *
  * Every statement is idempotent, but it is ~40 of them and each request pays a
- * round trip, so probe for an existing schema first and skip the DDL when it's
- * already there. On a cold deploy many instances start at once, so the creation
- * path takes an advisory lock and re-checks — otherwise concurrent CREATEs race
- * and some error out.
+ * round trip, so probe first and skip the DDL when the database is already at
+ * this version. The probe is a *version*, not merely "does the schema exist" —
+ * with an existence check, adding a table to SCHEMA_SQL would never reach any
+ * database that had already been created. On a cold deploy many instances start
+ * at once, so the write path takes an advisory lock and re-checks; otherwise
+ * concurrent CREATEs race and some error out.
+ *
+ * Bump SCHEMA_VERSION whenever SCHEMA_SQL gains a statement.
  */
 export function ready(): Promise<void> {
   migrated ??= (async () => {
-    if (await schemaExists()) return;
+    if (await schemaCurrent()) return;
 
     await sql().begin(async (tx) => {
       await tx`SELECT pg_advisory_xact_lock(${SCHEMA_LOCK})`;
-      // Another instance may have created it while we waited for the lock.
+
+      // Another instance may have applied it while we waited for the lock.
+      // Two statements, not one with a CASE guard: Postgres resolves relations
+      // when it parses, so a branch that merely *mentions* a missing table
+      // still errors out.
       const [{ present }] = await tx<{ present: boolean }[]>`
-        SELECT to_regclass('sat.sync_state') IS NOT NULL AS present
+        SELECT to_regclass('sat.schema_version') IS NOT NULL AS present
       `;
-      if (!present) await tx.unsafe(SCHEMA_SQL);
+      if (present) {
+        const [row] = await tx<{ version: number }[]>`SELECT version FROM sat.schema_version`;
+        if ((row?.version ?? 0) >= SCHEMA_VERSION) return;
+      }
+
+      await tx.unsafe(SCHEMA_SQL);
+      await tx.unsafe(
+        `INSERT INTO sat.schema_version (only_row, version) VALUES (true, ${SCHEMA_VERSION})
+         ON CONFLICT (only_row) DO UPDATE SET version = excluded.version, applied_at = now()`,
+      );
     });
   })();
   return migrated;
 }
 
-async function schemaExists(): Promise<boolean> {
+async function schemaCurrent(): Promise<boolean> {
   try {
-    const [row] = await sql()<{ present: boolean }[]>`
-      SELECT to_regclass('sat.sync_state') IS NOT NULL AS present
+    const [row] = await sql()<{ current: boolean }[]>`
+      SELECT COALESCE(
+        (SELECT version FROM sat.schema_version), 0
+      ) >= ${SCHEMA_VERSION} AS current
     `;
-    return row?.present ?? false;
+    return row?.current ?? false;
   } catch {
+    // The table itself is missing on a fresh database.
     return false;
   }
 }

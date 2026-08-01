@@ -6,6 +6,11 @@ import { GrabberIcon } from "./icons";
 /**
  * Stimulus left / question right, split by a draggable rule carrying the
  * Bluebook grabber handle at vertical centre.
+ *
+ * Below `md` the two panes stack and each scrolls on its own — a side-by-side
+ * split at phone width leaves neither column wide enough to read. The drag
+ * ratio is published as a custom property so it only takes effect once the
+ * panes are actually side by side.
  */
 export function SplitPane({
   left,
@@ -44,22 +49,28 @@ export function SplitPane({
   if (singleColumn) {
     return (
       <div className="h-full overflow-y-auto bb-scroll">
-        <div className="mx-auto h-full max-w-[720px] px-[40px] pt-[24px]">{right}</div>
+        <div className="mx-auto h-full max-w-[720px] px-[20px] pt-[18px] md:px-[40px] md:pt-[24px]">
+          {right}
+        </div>
       </div>
     );
   }
 
   return (
-    <div ref={containerRef} className="flex h-full min-h-0">
-      <div
-        className="h-full overflow-y-auto bb-scroll"
-        style={{ width: `${ratio * 100}%` }}
-      >
-        <div className="px-[43px] pb-[40px] pt-[22px]">{left}</div>
+    <div
+      ref={containerRef}
+      className="flex h-full min-h-0 flex-col md:flex-row"
+      style={{ "--split": `${ratio * 100}%` } as React.CSSProperties}
+    >
+      <div className="h-[42%] w-full shrink-0 overflow-y-auto bb-scroll md:h-full md:w-[var(--split)]">
+        <div className="px-[20px] pb-[20px] pt-[16px] md:px-[43px] md:pb-[40px] md:pt-[22px]">
+          {left}
+        </div>
       </div>
 
-      <div className="relative w-0 shrink-0">
-        <div className="absolute inset-y-0 -left-[1px] w-[2px] bg-bb-divider" />
+      {/* Vertical rule + grabber (desktop) / plain rule (stacked) */}
+      <div className="relative h-0 w-full shrink-0 md:h-auto md:w-0">
+        <div className="absolute inset-x-0 -top-[1px] h-[2px] bg-bb-divider md:inset-x-auto md:inset-y-0 md:-left-[1px] md:h-auto md:w-[2px]" />
         <button
           type="button"
           aria-label="Resize panels"
@@ -68,14 +79,16 @@ export function SplitPane({
             document.body.style.cursor = "col-resize";
             document.body.style.userSelect = "none";
           }}
-          className="absolute left-1/2 top-1/2 z-10 flex h-[26px] w-[16px] -translate-x-1/2 -translate-y-1/2 cursor-col-resize items-center justify-center rounded-[3px] bg-bb-ink text-white"
+          className="absolute left-1/2 top-1/2 z-10 hidden h-[26px] w-[16px] -translate-x-1/2 -translate-y-1/2 cursor-col-resize items-center justify-center rounded-[3px] bg-bb-ink text-white md:flex"
         >
           <GrabberIcon className="h-[16px] w-[11px]" />
         </button>
       </div>
 
-      <div className="h-full flex-1 overflow-y-auto bb-scroll">
-        <div className="px-[43px] pb-[40px] pt-[22px]">{right}</div>
+      <div className="min-h-0 flex-1 overflow-y-auto bb-scroll md:h-full">
+        <div className="px-[20px] pb-[24px] pt-[16px] md:px-[43px] md:pb-[40px] md:pt-[22px]">
+          {right}
+        </div>
       </div>
     </div>
   );

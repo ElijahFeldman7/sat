@@ -19,13 +19,13 @@ export default async function HistoryPage() {
 
   return (
     <AppShell active="/history" userName={user.name}>
-      <div className="mx-auto w-full max-w-[1000px] px-[40px] py-[34px]">
-        <h1 className="text-[32px] font-bold leading-[1.15] tracking-[-0.02em] text-bb-ink">
+      <div className="mx-auto w-full max-w-[1000px] px-[20px] py-[24px] md:px-[40px] md:py-[34px]">
+        <h1 className="text-[26px] font-bold leading-[1.15] tracking-[-0.02em] text-bb-ink md:text-[32px]">
           Past sets
         </h1>
 
         {sets.length === 0 ? (
-          <Card className="mt-[24px] p-[40px] text-center">
+          <Card className="mt-[24px] p-[28px] text-center md:p-[40px]">
             <p className="text-[17px] text-black/60">You haven&rsquo;t built a drill yet.</p>
             <Link
               href="/drill/new"
@@ -40,8 +40,8 @@ export default async function HistoryPage() {
               const done = s.status === "complete";
               const pct = done && s.total ? Math.round((s.correct / s.total) * 100) : null;
               return (
-                <div key={s.id} className="flex items-center gap-[18px] px-[22px] py-[16px]">
-                  <div className="min-w-0 flex-1">
+                <div key={s.id} className="flex flex-wrap items-center gap-x-[16px] gap-y-[10px] px-[18px] py-[14px] md:flex-nowrap md:gap-[18px] md:px-[22px] md:py-[16px]">
+                  <div className="w-full min-w-0 md:w-auto md:flex-1">
                     <div className="truncate text-[17px] font-medium text-bb-ink">{s.name}</div>
                     <div className="mt-[3px] text-[14px] text-black/50">
                       {new Date(s.created_at).toLocaleString(undefined, {
@@ -56,7 +56,7 @@ export default async function HistoryPage() {
                     </div>
                   </div>
 
-                  <div className="w-[92px] shrink-0 text-right">
+                  <div className="shrink-0 md:w-[92px] md:text-right">
                     {done ? (
                       <>
                         <div className="text-[18px] font-bold tabular-nums text-bb-ink">
@@ -73,7 +73,7 @@ export default async function HistoryPage() {
 
                   <Link
                     href={done ? `/results/${s.id}` : `/session/${s.id}`}
-                    className="shrink-0 rounded-full border border-bb-blue px-[18px] py-[8px] text-[14px] font-bold text-bb-blue hover:bg-bb-blue/5"
+                    className="ml-auto shrink-0 rounded-full border border-bb-blue px-[18px] py-[8px] text-[14px] font-bold text-bb-blue hover:bg-bb-blue/5 md:ml-0"
                   >
                     {done ? "Review" : "Resume"}
                   </Link>

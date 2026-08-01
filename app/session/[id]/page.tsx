@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { ExamShell } from "@/components/exam/ExamShell";
+import { TimeTracker } from "@/components/TimeTracker";
 import { requireUser } from "@/lib/session";
 import { getDrillQuestions, getDrillSet, getHighlights } from "@/lib/db/queries";
 import { loadDetails, toExamQuestion } from "@/lib/questions";
@@ -54,5 +55,12 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
     }),
   };
 
-  return <ExamShell payload={payload} userName={user.name} highlights={highlights} />;
+  // The exam route sits outside AppShell, so it mounts the tracker itself —
+  // time in a drill is exactly the time that matters most.
+  return (
+    <>
+      <TimeTracker />
+      <ExamShell payload={payload} userName={user.name} highlights={highlights} />
+    </>
+  );
 }

@@ -10,8 +10,10 @@ import path from "node:path";
 
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const PORT = 9333;
-const WIDTH = 1470;
-const HEIGHT = 890;
+// Bluebook reference viewport by default; override to check narrow layouts.
+const WIDTH = Number(process.env.SHOOT_WIDTH) || 1470;
+const HEIGHT = Number(process.env.SHOOT_HEIGHT) || 890;
+const MOBILE = process.env.SHOOT_MOBILE === "1";
 
 const [outDir, cookie, ...targets] = process.argv.slice(2);
 if (!outDir || !cookie || !targets.length) {
@@ -92,7 +94,7 @@ try {
     width: WIDTH,
     height: HEIGHT,
     deviceScaleFactor: 1,
-    mobile: false,
+    mobile: MOBILE,
   });
   await cdp.send("Network.setCookie", {
     name: cookieName,

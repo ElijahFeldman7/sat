@@ -43,17 +43,17 @@ export default async function ProgressPage() {
 
   return (
     <AppShell active="/progress" userName={user.name}>
-      <div className="mx-auto w-full max-w-[1000px] px-[40px] py-[34px]">
-        <h1 className="text-[32px] font-bold leading-[1.15] tracking-[-0.02em] text-bb-ink">
+      <div className="mx-auto w-full max-w-[1000px] px-[20px] py-[24px] md:px-[40px] md:py-[34px]">
+        <h1 className="text-[26px] font-bold leading-[1.15] tracking-[-0.02em] text-bb-ink md:text-[32px]">
           Progress
         </h1>
 
-        <div className="mt-[22px] grid grid-cols-1 gap-[20px] md:grid-cols-3">
+        <div className="mt-[22px] grid grid-cols-1 gap-[16px] sm:grid-cols-2 md:gap-[20px] lg:grid-cols-3">
           {(["math", "rw"] as ModuleKey[]).map((m) => {
             const s = overall.find((x) => x.module === m);
             const pct = s?.attempted ? Math.round((s.correct / s.attempted) * 100) : 0;
             return (
-              <Card key={m} className="flex items-center gap-[20px] p-[24px]">
+              <Card key={m} className="flex items-center gap-[16px] p-[20px] md:gap-[20px] md:p-[24px]">
                 <Ring pct={pct} />
                 <div>
                   <div className="text-[17px] font-bold text-bb-ink">{MODULES[m].name}</div>
@@ -64,7 +64,7 @@ export default async function ProgressPage() {
               </Card>
             );
           })}
-          <Card className="flex flex-col justify-center p-[24px]">
+          <Card className="flex flex-col justify-center p-[20px] md:p-[24px]">
             <div className="text-[32px] font-bold leading-none tabular-nums text-bb-ink">
               {due}
             </div>
@@ -75,7 +75,7 @@ export default async function ProgressPage() {
         </div>
 
         {/* Activity strip */}
-        <Card className="mt-[20px] p-[24px]">
+        <Card className="mt-[20px] p-[20px] md:p-[24px]">
           <h2 className="text-[19px] font-bold text-bb-ink">Last 30 days</h2>
           <div className="mt-[16px] flex items-end gap-[4px]">
             {days.map((d) => (
@@ -98,9 +98,10 @@ export default async function ProgressPage() {
 
         {/* Per-skill tables */}
         {modules.map(({ module, domains, stats }) => (
-          <Card key={module} className="mt-[20px] p-[24px]">
+          <Card key={module} className="mt-[20px] p-[20px] md:p-[24px]">
             <h2 className="text-[19px] font-bold text-bb-ink">{MODULES[module].name} by skill</h2>
-            <table className="mt-[14px] w-full text-[15px]">
+            <div className="-mx-[20px] mt-[14px] overflow-x-auto px-[20px] md:mx-0 md:px-0 bb-scroll">
+            <table className="w-full min-w-[520px] text-[15px]">
               <thead>
                 <tr className="border-b border-black/12 text-left text-[13px] uppercase tracking-wide text-black/45">
                   <th className="pb-[8px] font-medium">Skill</th>
@@ -162,6 +163,7 @@ export default async function ProgressPage() {
                 ])}
               </tbody>
             </table>
+            </div>
           </Card>
         ))}
 

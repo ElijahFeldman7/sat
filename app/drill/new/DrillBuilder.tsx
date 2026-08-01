@@ -185,8 +185,8 @@ export function DrillBuilder() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1000px] px-[40px] py-[34px]">
-      <h1 className="text-[32px] font-bold leading-[1.15] tracking-[-0.02em] text-bb-ink">
+    <div className="mx-auto w-full max-w-[1000px] px-[20px] py-[24px] md:px-[40px] md:py-[34px]">
+      <h1 className="text-[26px] font-bold leading-[1.15] tracking-[-0.02em] text-bb-ink md:text-[32px]">
         Build a drill
       </h1>
 
@@ -195,7 +195,7 @@ export function DrillBuilder() {
         <select
           value={assessmentId}
           onChange={(e) => changeAssessment(Number(e.target.value))}
-          className="h-[38px] rounded-[8px] border border-black/20 bg-white px-[12px] text-[15px] text-bb-ink"
+          className="h-[38px] w-full rounded-[8px] border border-black/20 bg-white px-[12px] text-[15px] text-bb-ink sm:w-auto"
         >
           {ASSESSMENTS.map((a) => (
             <option key={a.id} value={a.id}>
@@ -204,13 +204,13 @@ export function DrillBuilder() {
           ))}
         </select>
 
-        <div className="flex overflow-hidden rounded-[8px] border border-black/20">
+        <div className="flex w-full overflow-hidden rounded-[8px] border border-black/20 sm:w-auto">
           {(["math", "rw"] as ModuleKey[]).map((m) => (
             <button
               key={m}
               type="button"
               onClick={() => changeModule(m)}
-              className={`h-[38px] px-[20px] text-[15px] font-medium ${
+              className={`h-[38px] flex-1 px-[20px] text-[15px] font-medium sm:flex-none ${
                 module === m ? "bg-bb-blue text-white" : "bg-white text-bb-ink hover:bg-black/5"
               }`}
             >
@@ -221,7 +221,7 @@ export function DrillBuilder() {
       </div>
 
       {/* Topics */}
-      <Card className="mt-[20px] p-[24px]">
+      <Card className="mt-[20px] p-[16px] md:p-[24px]">
         <div className="flex items-baseline justify-between">
           <h2 className="text-[20px] font-bold text-bb-ink">Topics</h2>
           <div className="flex items-center gap-[16px] text-[14px]">
@@ -321,7 +321,7 @@ export function DrillBuilder() {
                                 </span>
                               </span>
 
-                              <span className="flex w-[110px] shrink-0 items-center gap-[8px]">
+                              <span className="hidden w-[110px] shrink-0 items-center gap-[8px] sm:flex">
                                 {skill.accuracy !== null ? (
                                   <>
                                     <span className="h-[6px] flex-1 overflow-hidden rounded-full bg-black/10">
@@ -362,11 +362,11 @@ export function DrillBuilder() {
       </Card>
 
       {/* Options */}
-      <Card className="mt-[20px] p-[24px]">
+      <Card className="mt-[20px] p-[16px] md:p-[24px]">
         <h2 className="text-[20px] font-bold text-bb-ink">Options</h2>
 
         <div className="mt-[16px] flex flex-wrap items-center gap-[10px]">
-          <span className="w-[110px] text-[15px] text-black/60">Difficulty</span>
+          <span className="w-full text-[15px] text-black/60 sm:w-[110px]">Difficulty</span>
           {DIFFICULTIES.map((d) => {
             const on = difficulties.has(d);
             return (
@@ -396,8 +396,8 @@ export function DrillBuilder() {
           )}
         </div>
 
-        <div className="mt-[18px] flex items-center gap-[10px]">
-          <span className="w-[110px] text-[15px] text-black/60">Questions</span>
+        <div className="mt-[18px] flex flex-wrap items-center gap-[10px]">
+          <span className="w-full text-[15px] text-black/60 sm:w-[110px]">Questions</span>
           <input
             type="range"
             min={4}
@@ -405,10 +405,10 @@ export function DrillBuilder() {
             step={1}
             value={count}
             onChange={(e) => setCount(Number(e.target.value))}
-            className="h-[4px] w-[280px] accent-[#384cc0]"
+            className="h-[4px] min-w-0 flex-1 accent-[#384cc0] sm:w-[280px] sm:flex-none"
           />
           <span className="w-[36px] text-[16px] font-bold tabular-nums text-bb-ink">{count}</span>
-          <span className="text-[13px] text-black/40">
+          <span className="w-full text-[13px] text-black/40 sm:w-auto">
             {availableForSelection} match your topic filter
           </span>
         </div>
@@ -437,12 +437,12 @@ export function DrillBuilder() {
         </p>
       )}
 
-      <div className="mt-[24px] flex items-center gap-[16px] pb-[40px]">
+      <div className="mt-[24px] flex flex-col items-start gap-[12px] pb-[40px] sm:flex-row sm:items-center sm:gap-[16px]">
         <button
           type="button"
           onClick={() => setTimingOpen(true)}
           disabled={loading || availableForSelection === 0}
-          className="h-[46px] rounded-full bg-bb-blue px-[30px] text-[17px] font-bold text-white hover:bg-bb-blue-hover disabled:cursor-not-allowed disabled:bg-black/15 disabled:text-black/40"
+          className="h-[46px] w-full rounded-full bg-bb-blue px-[30px] text-[17px] font-bold text-white hover:bg-bb-blue-hover disabled:cursor-not-allowed disabled:bg-black/15 disabled:text-black/40 sm:w-auto"
         >
           Create drill
         </button>

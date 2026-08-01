@@ -48,11 +48,11 @@ export default async function DashboardPage() {
 
   return (
     <AppShell active="/dashboard" userName={user.name}>
-      <div className="mx-auto w-full max-w-[1120px] px-[40px] py-[38px]">
-        <h1 className="text-[34px] font-bold leading-[1.15] tracking-[-0.02em] text-bb-ink">
+      <div className="mx-auto w-full max-w-[1120px] px-[20px] py-[26px] md:px-[40px] md:py-[38px]">
+        <h1 className="text-[26px] font-bold leading-[1.15] tracking-[-0.02em] text-bb-ink md:text-[34px]">
           {greeting()}, {user.name.split(" ")[0]}.
         </h1>
-        <p className="mt-[8px] text-[17px] text-black/60">
+        <p className="mt-[8px] text-[16px] text-black/60 md:text-[17px]">
           {totalAttempted === 0
             ? "Start with a topic drill — pick the skills you want to work on."
             : `${totalCorrect} of ${totalAttempted} correct across all your practice (${Math.round(
@@ -61,18 +61,18 @@ export default async function DashboardPage() {
         </p>
 
         {activeSet && (
-          <Card className="mt-[24px] flex items-center justify-between border-l-[5px] border-bb-blue px-[24px] py-[18px]">
-            <div>
+          <Card className="mt-[24px] flex flex-col gap-[14px] border-l-[5px] border-bb-blue px-[20px] py-[18px] sm:flex-row sm:items-center sm:justify-between sm:px-[24px]">
+            <div className="min-w-0">
               <div className="text-[17px] font-bold text-bb-ink">
                 You have a drill in progress
               </div>
-              <div className="mt-[3px] text-[15px] text-black/60">
+              <div className="mt-[3px] truncate text-[15px] text-black/60">
                 {activeSet.name} · {activeSet.answered} of {activeSet.total} answered
               </div>
             </div>
             <Link
               href={`/session/${activeSet.id}`}
-              className="h-[40px] shrink-0 rounded-full bg-bb-blue px-[24px] text-[16px] font-bold leading-[40px] text-white hover:bg-bb-blue-hover"
+              className="h-[40px] shrink-0 rounded-full bg-bb-blue px-[24px] text-center text-[16px] font-bold leading-[40px] text-white hover:bg-bb-blue-hover"
             >
               Resume
             </Link>
@@ -80,8 +80,8 @@ export default async function DashboardPage() {
         )}
 
         {/* Primary actions */}
-        <div className="mt-[26px] grid grid-cols-1 gap-[20px] md:grid-cols-3">
-          <Card className="flex flex-col p-[24px] md:col-span-1">
+        <div className="mt-[26px] grid grid-cols-1 gap-[16px] sm:grid-cols-2 md:gap-[20px] lg:grid-cols-3">
+          <Card className="flex flex-col p-[20px] sm:col-span-2 md:p-[24px] lg:col-span-1">
             <h2 className="text-[20px] font-bold text-bb-ink">Drill by Topic</h2>
             <p className="mt-[8px] flex-1 text-[15px] leading-[1.5] text-black/60">
               Choose any combination of skills and difficulties, then set your pacing.
@@ -94,7 +94,7 @@ export default async function DashboardPage() {
             </Link>
           </Card>
 
-          <Card className="flex flex-col p-[24px]">
+          <Card className="flex flex-col p-[20px] md:p-[24px]">
             <h2 className="text-[20px] font-bold text-bb-ink">Weak Spots</h2>
             {weakest.length ? (
               <ul className="mt-[10px] flex-1 space-y-[6px] text-[15px] text-black/70">
@@ -119,7 +119,7 @@ export default async function DashboardPage() {
             />
           </Card>
 
-          <Card className="flex flex-col p-[24px]">
+          <Card className="flex flex-col p-[20px] md:p-[24px]">
             <h2 className="text-[20px] font-bold text-bb-ink">Review Misses</h2>
             <p className="mt-[8px] flex-1 text-[15px] leading-[1.5] text-black/60">
               {due > 0
@@ -136,12 +136,12 @@ export default async function DashboardPage() {
         </div>
 
         {/* Module summary */}
-        <div className="mt-[28px] grid grid-cols-1 gap-[20px] md:grid-cols-2">
+        <div className="mt-[28px] grid grid-cols-1 gap-[16px] md:grid-cols-2 md:gap-[20px]">
           {(["math", "rw"] as ModuleKey[]).map((m) => {
             const s = stats.find((x) => x.module === m);
             const pct = s && s.attempted ? Math.round((s.correct / s.attempted) * 100) : null;
             return (
-              <Card key={m} className="p-[24px]">
+              <Card key={m} className="p-[20px] md:p-[24px]">
                 <div className="flex items-baseline justify-between">
                   <h2 className="text-[19px] font-bold text-bb-ink">{MODULES[m].name}</h2>
                   <span className="text-[15px] text-black/50">
@@ -175,7 +175,7 @@ export default async function DashboardPage() {
                 <Link
                   key={s.id}
                   href={s.status === "complete" ? `/results/${s.id}` : `/session/${s.id}`}
-                  className="flex items-center justify-between px-[22px] py-[15px] hover:bg-black/[0.02]"
+                  className="flex items-center justify-between gap-[12px] px-[18px] py-[15px] hover:bg-black/[0.02] md:px-[22px]"
                 >
                   <div className="min-w-0">
                     <div className="truncate text-[16px] font-medium text-bb-ink">{s.name}</div>

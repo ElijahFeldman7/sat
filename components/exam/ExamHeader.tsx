@@ -1,6 +1,7 @@
 "use client";
 
 import { CalculatorIcon, ChevronDown, HighlightIcon, MoreIcon, NotesIcon } from "./icons";
+import { MoreMenu, type MoreMenuItem } from "./MoreMenu";
 import { PacingIndicator } from "./PacingIndicator";
 
 function formatClock(ms: number): string {
@@ -22,7 +23,9 @@ export function ExamHeader({
   onToggleDirections,
   highlightsOn,
   onToggleHighlights,
-  onMore,
+  moreOpen,
+  onToggleMore,
+  moreItems,
 }: {
   title: string;
   clockMs: number;
@@ -35,29 +38,32 @@ export function ExamHeader({
   onToggleDirections: () => void;
   highlightsOn: boolean;
   onToggleHighlights: () => void;
-  onMore: () => void;
+  moreOpen: boolean;
+  onToggleMore: () => void;
+  moreItems: MoreMenuItem[];
 }) {
   return (
     <header className="bb-dash-b relative z-30 flex h-[78px] shrink-0 items-stretch bg-bb-band">
       {/* Left: section title + directions */}
-      <div className="flex w-[34%] flex-col justify-center pl-[43px]">
-        <h1 className="text-[22px] font-bold leading-[1.15] tracking-[-0.01em] text-bb-ink">
+      <div className="flex min-w-0 flex-col justify-center pl-[18px] md:w-[32%] md:pl-[48px]">
+        <h1 className="truncate text-[16px] font-medium leading-[1.15] tracking-[-0.01em] text-bb-ink md:text-[19px]">
           {title}
         </h1>
         <button
           type="button"
           onClick={onToggleDirections}
-          className="mt-[2px] flex w-fit items-center gap-[5px] text-[16px] leading-none text-bb-ink hover:underline"
+          className="mt-[10px] flex w-fit items-center gap-[5px] text-[13px] font-medium leading-none text-bb-ink hover:underline md:mt-[13px] md:text-[15px]"
         >
           Directions
           <ChevronDown className="h-[15px] w-[15px]" />
         </button>
       </div>
 
-      {/* Center: clock + hide toggle + pacing */}
+      {/* Center: clock + hide toggle + pacing. The clock is the one thing that
+          must stay centred, so it keeps its own column at every width. */}
       <div className="flex flex-1 flex-col items-center justify-center">
         <div
-          className={`text-[26px] font-normal leading-[1.1] tabular-nums text-bb-ink ${
+          className={`text-[18px] font-normal leading-[1.1] tabular-nums text-bb-ink md:text-[22px] ${
             clockHidden ? "invisible" : ""
           }`}
         >
@@ -67,7 +73,7 @@ export function ExamHeader({
           <button
             type="button"
             onClick={onToggleClock}
-            className="rounded-full border border-bb-ink px-[13px] py-[2px] text-[14px] font-medium leading-[1.4] text-bb-ink hover:bg-white"
+            className="rounded-full border border-bb-ink px-[13px] py-[2px] text-[13px] font-medium leading-[1.4] text-bb-ink hover:bg-white md:text-[14px]"
           >
             {clockHidden ? "Show" : "Hide"}
           </button>
@@ -75,44 +81,95 @@ export function ExamHeader({
         </div>
       </div>
 
-      {/* Right: tools */}
-      <div className="flex w-[34%] items-center justify-end gap-[26px] pr-[40px]">
+      {/* Right: tools. Labels drop away before the icons do. */}
+      <div className="flex items-center justify-end gap-[18px] pr-[16px] md:w-[32%] md:gap-[38px] md:pr-[48px]">
         {showCalculator && (
-          <button
-            type="button"
+          <ToolButton
             onClick={onToggleCalculator}
-            className={`flex flex-col items-center gap-[3px] text-[13px] leading-none ${
-              calculatorOpen ? "text-bb-blue" : "text-bb-ink"
-            }`}
+            active={calculatorOpen}
+            label="Calculator"
             title="Calculator (K)"
           >
             <CalculatorIcon className="h-[21px] w-[21px]" />
-            Calculator
-          </button>
+          </ToolButton>
         )}
-        <button
-          type="button"
+
+        <ToolButton
           onClick={onToggleHighlights}
-          className={`flex flex-col items-center gap-[3px] text-[13px] leading-none ${
-            highlightsOn ? "text-bb-blue" : "text-bb-ink"
-          }`}
-          title="Highlights &amp; Notes (H)"
+          active={highlightsOn}
+          label="Highlights & Notes"
+          title="Highlights & Notes (H)"
         >
           <span className="flex items-end gap-[6px]">
             <HighlightIcon className="h-[21px] w-[21px]" />
             <NotesIcon className="h-[20px] w-[20px]" />
           </span>
-          Highlights &amp; Notes
-        </button>
-        <button
-          type="button"
-          onClick={onMore}
-          className="flex flex-col items-center gap-[3px] text-[13px] leading-none text-bb-ink"
+        </ToolButton>
+
+        <ToolButton
+          id="exam-more-button"
+          onClick={onToggleMore}
+          active={moreOpen}
+          label="More"
+          expanded={moreOpen}
         >
           <MoreIcon className="h-[21px] w-[21px]" />
-          More
-        </button>
+        </ToolButton>
       </div>
+
+      {moreOpen && (
+        <MoreMenu items={moreItems} onClose={onToggleMore} labelledBy="exam-more-button" />
+      )}
     </header>
+  );
+}
+
+/**
+ * A header tool. Active state is an underline under the label rather than a
+ * colour change — that is how Bluebook marks the open tool, and it survives the
+ * label being hidden at narrow widths because the rule sits under the icon too.
+ */
+function ToolButton({
+  id,
+  onClick,
+  active,
+  label,
+  title,
+  expanded,
+  children,
+}: {
+  id?: string;
+  onClick: () => void;
+  active: boolean;
+  label: string;
+  title?: string;
+  expanded?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      id={id}
+      type="button"
+      onClick={onClick}
+      title={title ?? label}
+      aria-label={label}
+      aria-pressed={expanded === undefined ? active : undefined}
+      aria-expanded={expanded}
+      aria-haspopup={expanded === undefined ? undefined : "menu"}
+      className="flex flex-col items-center gap-[6px] text-[13px] leading-none text-bb-ink"
+    >
+      {children}
+      <span
+        className={`hidden whitespace-nowrap border-b-[1.5px] pb-[1px] sm:inline ${
+          active ? "border-bb-ink font-bold" : "border-transparent"
+        }`}
+      >
+        {label}
+      </span>
+      {/* Narrow screens hide the label, so the active rule moves under the icon. */}
+      <span
+        className={`h-[1.5px] w-[22px] sm:hidden ${active ? "bg-bb-ink" : "bg-transparent"}`}
+      />
+    </button>
   );
 }
