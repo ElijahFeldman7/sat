@@ -115,7 +115,9 @@ export default async function DashboardPage() {
             <QuickDrillButton
               className="mt-[18px]"
               label="Drill weak spots"
-              body={{ kind: "adaptive", module: weakest[0]?.module ?? "math", count: 10 }}
+              pickModule
+              defaultModule={weakest[0]?.module ?? "math"}
+              body={{ kind: "adaptive", count: 10 }}
             />
           </Card>
 

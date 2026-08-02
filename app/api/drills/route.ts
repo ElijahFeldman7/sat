@@ -19,6 +19,7 @@ interface Body {
   timingMode?: "per-question" | "total" | "untimed";
   secondsPerQuestion?: number;
   totalSeconds?: number;
+  secondsPerSkill?: Record<string, number>;
   includeLegacy?: boolean;
   excludeSeen?: boolean;
 }
@@ -32,10 +33,19 @@ export async function POST(req: NextRequest) {
     const assessmentId = body.assessment ?? DEFAULT_ASSESSMENT_ID;
     const moduleKey: ModuleKey = body.module === "rw" ? "rw" : "math";
     const count = Math.min(Math.max(body.count ?? 10, 1), 60);
+    // Per-skill budgets are clamped to the same range the slider offers, so a
+    // hand-rolled request cannot plant a nonsense clock in a stored config.
+    const secondsPerSkill = Object.fromEntries(
+      Object.entries(body.secondsPerSkill ?? {})
+        .filter(([, v]) => Number.isFinite(v))
+        .map(([k, v]) => [k, Math.min(600, Math.max(10, Math.round(v)))]),
+    );
+
     const timing = {
       timingMode: body.timingMode ?? "per-question",
       secondsPerQuestion: body.secondsPerQuestion ?? 75,
       totalSeconds: body.totalSeconds,
+      secondsPerSkill: Object.keys(secondsPerSkill).length ? secondsPerSkill : undefined,
     } as const;
 
     if (body.kind === "srs") {

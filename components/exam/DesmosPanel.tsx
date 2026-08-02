@@ -27,7 +27,7 @@ declare global {
 }
 
 /**
- * Graphing calculator docked to the left of the exam. The parent shell gives it
+ * Graphing calculator docked to the right of the exam. The parent shell gives it
  * its own grid column, so opening it *shifts* the test content rather than
  * covering it. The instance is created once and kept mounted.
  */
@@ -78,7 +78,8 @@ export function DesmosPanel({
   const onPointerMove = useCallback(
     (e: PointerEvent) => {
       if (!dragging) return;
-      onWidthChange(Math.min(900, Math.max(360, e.clientX)));
+      // Docked right, so the panel grows as the pointer moves *toward* 0.
+      onWidthChange(Math.min(900, Math.max(360, window.innerWidth - e.clientX)));
     },
     [dragging, onWidthChange],
   );
@@ -108,7 +109,7 @@ export function DesmosPanel({
     <>
       {open && <Script src={DESMOS_SRC} onReady={() => setScriptReady(true)} />}
       <aside
-        className="relative h-full min-h-0 shrink-0 overflow-hidden border-r border-black/15 bg-white"
+        className="relative h-full min-h-0 shrink-0 overflow-hidden border-l border-black/15 bg-white"
         style={{
           width: open ? width : 0,
           transition: dragging ? "none" : "width 200ms ease",
@@ -143,7 +144,7 @@ export function DesmosPanel({
               document.body.style.cursor = "col-resize";
               document.body.style.userSelect = "none";
             }}
-            className="absolute inset-y-0 right-0 w-[6px] cursor-col-resize hover:bg-bb-blue/20"
+            className="absolute inset-y-0 left-0 z-10 w-[6px] cursor-col-resize hover:bg-bb-blue/20"
           />
         )}
       </aside>

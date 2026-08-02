@@ -237,6 +237,54 @@ export interface TopicSkill {
   attempted: number;
   correct: number;
   accuracy: number | null;
+  /** Median seconds this student has spent per question here; null if new. */
+  medianSeconds: number | null;
+  /** The same median split by difficulty — a hard item costs more than an easy one. */
+  medianByDifficulty: Partial<Record<Difficulty, number>>;
+}
+
+export interface SkillTimeMedian {
+  skill_name: string;
+  difficulty: Difficulty | null;
+  seconds: number;
+}
+
+/**
+ * Median seconds per question, per skill and per skill×difficulty.
+ *
+ * A `null` difficulty row is the skill's median across all difficulties, used
+ * when the student has no history at the specific difficulty being drilled.
+ * Median rather than mean throughout: one walked-away-from question would drag
+ * an average far past anything the student actually needs.
+ */
+export async function skillTimeMedians(
+  userId: string,
+  assessmentId: number,
+  module: ModuleKey,
+): Promise<SkillTimeMedian[]> {
+  const rows = await all<{ skill_name: string; difficulty: Difficulty | null; median_ms: string }>(
+    `WITH times AS (
+       SELECT q.skill_name, q.difficulty, dq.time_spent_ms
+       FROM drill_questions dq
+       JOIN drill_sets ds ON ds.id = dq.set_id
+       JOIN questions q ON q.key = dq.question_key
+                       AND q.assessment_id = ds.assessment_id
+                       AND q.module = ds.module
+       WHERE ds.user_id = ? AND ds.assessment_id = ? AND ds.module = ?
+         AND dq.time_spent_ms > 0
+     )
+     SELECT skill_name, difficulty,
+            percentile_cont(0.5) WITHIN GROUP (ORDER BY time_spent_ms) AS median_ms
+     FROM times GROUP BY GROUPING SETS ((skill_name), (skill_name, difficulty))`,
+    [userId, assessmentId, module],
+  );
+  return rows
+    .map((r) => ({
+      skill_name: r.skill_name,
+      difficulty: r.difficulty,
+      seconds: Math.max(1, Math.round(Number(r.median_ms) / 1000)),
+    }))
+    .filter((r) => Number.isFinite(r.seconds));
 }
 
 export interface TopicDomain {
@@ -260,6 +308,10 @@ export async function topicTree(
   opts: { includeLegacy: boolean; excludeSeen: boolean },
 ): Promise<TopicDomain[]> {
   const sourceFilter = opts.includeLegacy ? "" : "AND q.source = 'qbank'";
+
+  // Timings need GROUPING SETS, which would force the shape of the query above
+  // — cheaper to run the two in parallel than to contort either.
+  const timings = skillTimeMedians(userId, assessmentId, module);
 
   const rows = await all<{
     domain_code: string;
@@ -309,6 +361,18 @@ export async function topicTree(
     [assessmentId, module, userId, assessmentId, module, userId, assessmentId, module],
   );
 
+  const overall = new Map<string, number>();
+  const byDifficulty = new Map<string, Partial<Record<Difficulty, number>>>();
+  for (const t of await timings) {
+    if (t.difficulty === null) {
+      overall.set(t.skill_name, t.seconds);
+    } else {
+      const bucket = byDifficulty.get(t.skill_name) ?? {};
+      bucket[t.difficulty] = t.seconds;
+      byDifficulty.set(t.skill_name, bucket);
+    }
+  }
+
   const domains = new Map<string, TopicDomain>();
   for (const row of rows) {
     let domain = domains.get(row.domain_code);
@@ -325,6 +389,8 @@ export async function topicTree(
       attempted,
       correct,
       accuracy: attempted > 0 ? correct / attempted : null,
+      medianSeconds: overall.get(row.skill_name) ?? null,
+      medianByDifficulty: byDifficulty.get(row.skill_name) ?? {},
     });
   }
 
@@ -435,6 +501,12 @@ export interface DrillConfig {
   secondsPerQuestion?: number;
   /** seconds, when timingMode === 'total' */
   totalSeconds?: number;
+  /**
+   * Per-question seconds for specific skills, when timingMode is
+   * 'per-question'. The pacing ring reads this first so a topic the student is
+   * slow on gets its own budget; `secondsPerQuestion` is the fallback.
+   */
+  secondsPerSkill?: Record<string, number>;
   skills: string[];
   difficulties: Difficulty[];
   includeLegacy: boolean;

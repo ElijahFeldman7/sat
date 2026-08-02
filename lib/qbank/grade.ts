@@ -53,6 +53,8 @@ export function gradeSpr(userAnswer: string, correctKeys: string[]): boolean {
   const userValue = parseNumeric(user);
   if (userValue === null) return false;
 
+  const userPlaces = decimalPlaces(user);
+
   for (const key of correctKeys) {
     const keyValue = parseNumeric(key);
     if (keyValue === null) continue;
@@ -66,6 +68,18 @@ export function gradeSpr(userAnswer: string, correctKeys: string[]): boolean {
       const truncated = Math.trunc(userValue * factor) / factor;
       const rounded = Math.round(userValue * factor) / factor;
       if (nearlyEqual(truncated, keyValue) || nearlyEqual(rounded, keyValue)) return true;
+    }
+
+    // The other direction, and the one the real exam actually specifies: the
+    // key is exact — usually a fraction, so it has no decimal places of its own
+    // — and the student gave the rounded or truncated decimal. -49/150 has to
+    // accept -0.327 and -0.326. Three places is the exam's stated minimum for
+    // an answer that does not terminate, so a lazier 0.33 for 1/3 stays wrong.
+    if (userPlaces >= 3) {
+      const factor = 10 ** userPlaces;
+      const truncated = Math.trunc(keyValue * factor) / factor;
+      const rounded = Math.round(keyValue * factor) / factor;
+      if (nearlyEqual(truncated, userValue) || nearlyEqual(rounded, userValue)) return true;
     }
   }
 

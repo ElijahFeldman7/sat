@@ -6,6 +6,7 @@ import {
   listCandidates,
   pickBalanced,
   skillStats,
+  skillTimeMedians,
   topicTree,
   type CandidateRow,
   type DrillConfig,
@@ -23,10 +24,42 @@ export interface CreateDrillInput {
   timingMode: DrillConfig["timingMode"];
   secondsPerQuestion?: number;
   totalSeconds?: number;
+  secondsPerSkill?: Record<string, number>;
   includeLegacy: boolean;
   excludeSeen: boolean;
   kind?: string;
   name?: string;
+}
+
+/**
+ * Per-question budgets for a set of questions, from the student's own medians.
+ *
+ * Used when the caller supplied none — Weak Spots and Review Misses are one
+ * click with no pacing dialog, so without this they fell back to a flat 75s for
+ * everyone. Keys are `skill|difficulty` where there is history at that
+ * difficulty and `skill` otherwise, which is the order the exam reads them in.
+ */
+export async function medianBudgets(
+  userId: string,
+  assessmentId: number,
+  module: ModuleKey,
+  picked: { skill_name: string; difficulty: Difficulty }[],
+): Promise<Record<string, number> | undefined> {
+  const medians = await skillTimeMedians(userId, assessmentId, module);
+  if (medians.length === 0) return undefined;
+
+  const wanted = new Set(picked.map((p) => `${p.skill_name}|${p.difficulty}`));
+  const skills = new Set(picked.map((p) => p.skill_name));
+
+  const out: Record<string, number> = {};
+  for (const m of medians) {
+    if (m.difficulty === null) {
+      if (skills.has(m.skill_name)) out[m.skill_name] = m.seconds;
+    } else if (wanted.has(`${m.skill_name}|${m.difficulty}`)) {
+      out[`${m.skill_name}|${m.difficulty}`] = m.seconds;
+    }
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 /** Wilson lower bound — ranks a 2/3 skill below a 40/60 one, as it should. */
@@ -104,10 +137,15 @@ export async function createDrill(userId: string, input: CreateDrillInput) {
     throw new Error("Could not load any questions from the question bank. Try again.");
   }
 
+  const secondsPerSkill =
+    input.secondsPerSkill ??
+    (await medianBudgets(userId, input.assessmentId, input.module, picked));
+
   const config: DrillConfig = {
     timingMode: input.timingMode,
     secondsPerQuestion: input.secondsPerQuestion,
     totalSeconds: input.totalSeconds,
+    secondsPerSkill,
     skills: input.skills,
     difficulties: input.difficulties,
     includeLegacy: input.includeLegacy,
@@ -165,14 +203,19 @@ export async function createSrsDrill(
   assessmentId: number,
   module: ModuleKey,
   count: number,
-  timing: Pick<CreateDrillInput, "timingMode" | "secondsPerQuestion" | "totalSeconds">,
+  timing: Pick<
+    CreateDrillInput,
+    "timingMode" | "secondsPerQuestion" | "totalSeconds" | "secondsPerSkill"
+  >,
 ) {
   const keys = await dueSrsKeys(userId, assessmentId, module, count);
   if (keys.length === 0) throw new Error("Nothing is due for review yet. Keep drilling!");
 
-  const refs = await all<QuestionRef>(
-    `SELECT key, source, external_id, ibn FROM questions
-     WHERE is_live = 0 AND assessment_id = ? AND module = ?
+  // `is_live` is boolean; comparing it to 0 is a SQLite leftover that Postgres
+  // rejects outright, which took every review drill down with it.
+  const refs = await all<QuestionRef & { skill_name: string; difficulty: Difficulty }>(
+    `SELECT key, source, external_id, ibn, skill_name, difficulty FROM questions
+     WHERE is_live = false AND assessment_id = ? AND module = ?
        AND key IN (${keys.map(() => "?").join(",")})`,
     [assessmentId, module, ...keys],
   );
@@ -188,6 +231,8 @@ export async function createSrsDrill(
     timingMode: timing.timingMode,
     secondsPerQuestion: timing.secondsPerQuestion,
     totalSeconds: timing.totalSeconds,
+    secondsPerSkill:
+      timing.secondsPerSkill ?? (await medianBudgets(userId, assessmentId, module, usable)),
     skills: [],
     difficulties: [],
     includeLegacy: true,

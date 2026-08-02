@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Card } from "@/components/Card";
+import { localDay } from "@/lib/day";
 import type { UserRow } from "@/lib/db/queries";
 import { GoalHeatmap, type DayDatum } from "./GoalHeatmap";
 
@@ -39,12 +40,13 @@ function initials(name: string | null, email: string | null): string {
 export function SettingsView({
   initialGoal,
   data,
-  todaySeconds,
+  serverTodaySeconds,
   users,
 }: {
   initialGoal: number;
   data: DayDatum[];
-  todaySeconds: number;
+  /** UTC-derived fallback, used only while hydrating. */
+  serverTodaySeconds: number;
   users: UserRow[] | null;
 }) {
   const [goal, setGoal] = useState(initialGoal);
@@ -75,6 +77,17 @@ export function SettingsView({
     // saveState is deliberately not a dependency — it is set by this effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [goal, initialGoal]);
+
+  /**
+   * `daily_time` rows are keyed by the browser's local day, so only the browser
+   * can pick today's. Served through useSyncExternalStore rather than an effect
+   * so the hydrating render still matches what the server sent.
+   */
+  const todaySeconds = useSyncExternalStore(
+    () => () => {},
+    () => data.find((d) => d.day === localDay(Date.now()))?.seconds ?? 0,
+    () => serverTodaySeconds,
+  );
 
   const todayMinutes = Math.round(todaySeconds / 60);
   const pct = Math.min(100, Math.round((todayMinutes / goal) * 100));

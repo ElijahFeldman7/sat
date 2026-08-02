@@ -21,9 +21,11 @@ export default async function SettingsPage() {
     isAdmin ? listUsers() : Promise.resolve(null),
   ]);
 
-  // The heatmap buckets by the *client's* local day, so "today" has to be
-  // resolved there too — the server's date can be a day off.
-  const todaySeconds =
+  // Only the SSR value. `daily_time` is bucketed by the student's *local* day,
+  // which the server cannot know — resolving it here in UTC reads the wrong row
+  // for every student west of Greenwich once their evening passes midnight UTC.
+  // SettingsView recomputes this against the real local day on mount.
+  const serverTodaySeconds =
     days.find((d) => d.day === new Date().toISOString().slice(0, 10))?.seconds ?? 0;
 
   return (
@@ -31,7 +33,7 @@ export default async function SettingsPage() {
       <SettingsView
         initialGoal={goal}
         data={days}
-        todaySeconds={todaySeconds}
+        serverTodaySeconds={serverTodaySeconds}
         users={users}
       />
     </AppShell>

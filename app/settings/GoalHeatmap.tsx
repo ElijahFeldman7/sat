@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { localDay } from "@/lib/day";
 
 /**
  * Sequential ramp for "how much of the goal was met", stepped from the app's
@@ -34,12 +35,6 @@ function fmtMinutes(m: number): string {
   const h = Math.floor(m / 60);
   const rest = m % 60;
   return rest ? `${h}h ${rest}m` : `${h}h`;
-}
-
-function localDay(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate(),
-  ).padStart(2, "0")}`;
 }
 
 /**

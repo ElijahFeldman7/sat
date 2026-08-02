@@ -99,12 +99,31 @@ export function ExamShell({
     (current?.timeSpentMs ?? 0) +
     liveQuestionMs;
 
-  const { timingMode, secondsPerQuestion, totalSeconds } = set.config;
-  const budgetMs =
-    timingMode === "per-question" ? (secondsPerQuestion ?? 75) * 1000 : 0;
+  const { timingMode, secondsPerQuestion, totalSeconds, secondsPerSkill } = set.config;
+
+  /**
+   * Budget for one question. Most specific first: this topic at this
+   * difficulty, then the topic at any difficulty, then the flat rate. Under a
+   * single total block the topic figures are still present — scaled by whatever
+   * ratio the total was moved by — so the ring has a target there too, falling
+   * back to an even split of the block.
+   */
+  const budgetFor = useCallback(
+    (q: { skill: string; difficulty: string } | undefined) => {
+      const own =
+        q && (secondsPerSkill?.[`${q.skill}|${q.difficulty}`] ?? secondsPerSkill?.[q.skill]);
+      if (own) return own * 1000;
+      if (timingMode === "total") return ((totalSeconds ?? 0) * 1000) / Math.max(1, total);
+      return (secondsPerQuestion || 75) * 1000;
+    },
+    [secondsPerQuestion, secondsPerSkill, timingMode, total, totalSeconds],
+  );
+
+  const budgetMs = timingMode === "untimed" ? 0 : budgetFor(current);
   const totalBudgetMs =
     timingMode === "per-question"
-      ? budgetMs * total
+      ? // Not budgetMs × total: with per-topic budgets each question differs.
+        questions.reduce((sum, q) => sum + budgetFor(q), 0)
       : timingMode === "total"
         ? (totalSeconds ?? 0) * 1000
         : 0;
@@ -393,7 +412,7 @@ export function ExamShell({
         clockHidden={clockHidden}
         onToggleClock={() => setClockHidden((v) => !v)}
         pacing={
-          timingMode === "per-question" && !onReviewPage
+          timingMode !== "untimed" && !onReviewPage && budgetMs > 0
             ? { elapsedMs: liveQuestionMs, budgetMs }
             : null
         }
@@ -411,15 +430,6 @@ export function ExamShell({
       <ExamBanner text={bannerText} />
 
       <div className="flex min-h-0 flex-1">
-        {isMath && (
-          <DesmosPanel
-            open={calcOpen}
-            width={calcWidth}
-            onWidthChange={setDraggedCalcWidth}
-            onClose={() => setCalcOpen(false)}
-          />
-        )}
-
         <main className="min-w-0 flex-1 bg-white">
           {onReviewPage ? (
             <ReviewPage
@@ -479,6 +489,15 @@ export function ExamShell({
             />
           )}
         </main>
+
+        {isMath && (
+          <DesmosPanel
+            open={calcOpen}
+            width={calcWidth}
+            onWidthChange={setDraggedCalcWidth}
+            onClose={() => setCalcOpen(false)}
+          />
+        )}
       </div>
 
       <ExamFooter

@@ -6,7 +6,7 @@ import { ASSESSMENTS, DIFFICULTY_LABELS, MODULES } from "@/lib/qbank/types";
 import type { Difficulty, ModuleKey } from "@/lib/qbank/types";
 import { Card } from "@/components/Card";
 import { ChevronDown } from "@/components/exam/icons";
-import { TimingModal } from "./TimingModal";
+import { TimingModal, type TopicShare } from "./TimingModal";
 
 interface TopicSkill {
   name: string;
@@ -15,6 +15,58 @@ interface TopicSkill {
   attempted: number;
   correct: number;
   accuracy: number | null;
+  medianSeconds: number | null;
+  medianByDifficulty: Partial<Record<Difficulty, number>>;
+}
+
+/**
+ * The student's typical time on a topic, narrowed to the difficulties actually
+ * being drilled — a Hard-only set should not be paced off an Easy-heavy median.
+ * Falls back to the topic's overall median when there's no history at those
+ * difficulties.
+ */
+function seedSeconds(skill: TopicSkill, difficulties: Set<Difficulty>): number | null {
+  if (difficulties.size) {
+    const known = [...difficulties]
+      .map((d) => skill.medianByDifficulty[d])
+      .filter((n): n is number => typeof n === "number");
+    if (known.length) return Math.round(known.reduce((a, b) => a + b, 0) / known.length);
+  }
+  return skill.medianSeconds;
+}
+
+/**
+ * Mirrors `pickBalanced` on the server: questions are dealt round-robin across
+ * the chosen topics, so with more topics than questions the later ones get
+ * nothing. Only topics that actually receive a question are worth pacing.
+ */
+function shareOut(
+  skills: TopicSkill[],
+  count: number,
+  difficulties: Set<Difficulty>,
+): TopicShare[] {
+  const got = new Map<string, number>();
+  let round = 0;
+  let placed = 0;
+  while (placed < count) {
+    let took = false;
+    for (const s of skills) {
+      if (round < s.available && placed < count) {
+        got.set(s.name, (got.get(s.name) ?? 0) + 1);
+        placed++;
+        took = true;
+      }
+    }
+    if (!took) break;
+    round++;
+  }
+  return skills
+    .filter((s) => got.has(s.name))
+    .map((s) => ({
+      name: s.name,
+      questions: got.get(s.name)!,
+      medianSeconds: seedSeconds(s, difficulties),
+    }));
 }
 
 interface TopicDomain {
@@ -113,11 +165,26 @@ export function DrillBuilder() {
 
   const allSkills = useMemo(() => domains.flatMap((d) => d.skills), [domains]);
 
-  const availableForSelection = useMemo(() => {
-    const pool = selected.size ? allSkills.filter((s) => selected.has(s.name)) : allSkills;
-    // Difficulty filtering happens server-side; this is the upper bound.
-    return pool.reduce((n, s) => n + s.available, 0);
-  }, [allSkills, selected]);
+  const pool = useMemo(
+    () => (selected.size ? allSkills.filter((s) => selected.has(s.name)) : allSkills),
+    [allSkills, selected],
+  );
+
+  // Difficulty filtering happens server-side; this is the upper bound.
+  const availableForSelection = useMemo(
+    () => pool.reduce((n, s) => n + s.available, 0),
+    [pool],
+  );
+
+  /**
+   * Per-topic pacing is only offered for an explicit selection. With "All
+   * topics" the list is every skill in the module, which is a wall of sliders
+   * for no benefit — that case gets the single total control instead.
+   */
+  const topicShares = useMemo(
+    () => (selected.size ? shareOut(pool, count, difficulties) : []),
+    [count, difficulties, pool, selected.size],
+  );
 
   // Skill names are module-scoped, so a module/exam switch invalidates them.
   function changeAssessment(id: number) {
@@ -156,6 +223,7 @@ export function DrillBuilder() {
     timingMode: "per-question" | "total" | "untimed";
     secondsPerQuestion?: number;
     totalSeconds?: number;
+    secondsPerSkill?: Record<string, number>;
   }) {
     setCreating(true);
     setError(null);
@@ -457,6 +525,7 @@ export function DrillBuilder() {
       {timingOpen && (
         <TimingModal
           count={count}
+          topics={topicShares}
           busy={creating}
           onCancel={() => setTimingOpen(false)}
           onConfirm={create}
