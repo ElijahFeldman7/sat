@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ASSESSMENTS, DIFFICULTY_LABELS, MODULES } from "@/lib/qbank/types";
 import type { Difficulty, ModuleKey } from "@/lib/qbank/types";
+import { blueprintFor, type ModulePart } from "@/lib/qbank/blueprint";
 import { Card } from "@/components/Card";
 import { ChevronDown } from "@/components/exam/icons";
 import { TimingModal, type TopicShare } from "./TimingModal";
@@ -123,6 +124,11 @@ export function DrillBuilder() {
   const [timingOpen, setTimingOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /** "custom" builds a drill from topics; "module" runs a mock test module. */
+  const [mode, setMode] = useState<"custom" | "module">("custom");
+  const [part, setPart] = useState<ModulePart>(2);
+  const blueprint = blueprintFor(module, part);
 
   // The query is fully described by these four inputs, so the fetch key doubles
   // as the loading signal — no separate `loading` state to keep in sync.
@@ -252,6 +258,32 @@ export function DrillBuilder() {
     }
   }
 
+  /** A module carries its own count and clock, so there is nothing to ask. */
+  async function startModule() {
+    setCreating(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/drills", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "module",
+          assessment: assessmentId,
+          module,
+          part,
+          includeLegacy,
+          excludeSeen,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Could not build the module");
+      router.push(`/session/${data.id}`);
+    } catch (err) {
+      setError((err as Error).message);
+      setCreating(false);
+    }
+  }
+
   return (
     <div className="mx-auto w-full max-w-[1000px] px-[20px] py-[24px] md:px-[40px] md:py-[34px]">
       <h1 className="text-[26px] font-bold leading-[1.15] tracking-[-0.02em] text-bb-ink md:text-[32px]">
@@ -286,10 +318,119 @@ export function DrillBuilder() {
             </button>
           ))}
         </div>
+
+        <div className="flex w-full overflow-hidden rounded-[8px] border border-black/20 sm:w-auto">
+          {(
+            [
+              ["custom", "Custom"],
+              ["module", "Mock module"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setMode(value)}
+              className={`h-[38px] flex-1 px-[20px] text-[15px] font-medium sm:flex-none ${
+                mode === value ? "bg-bb-blue text-white" : "bg-white text-bb-ink hover:bg-black/5"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
+      {mode === "module" && (
+        <Card className="mt-[20px] p-[16px] md:p-[24px]">
+          <h2 className="text-[20px] font-bold text-bb-ink">
+            {MODULES[module].name} module
+          </h2>
+          <p className="mt-[4px] text-[15px] leading-[1.5] text-black/55">
+            A full module on the real clock, assembled from questions you haven&rsquo;t seen to
+            the blueprint College Board publishes. It counts towards your topic stats and review
+            queue like any other drill.
+          </p>
+
+          <div className="mt-[16px] grid gap-[10px] sm:grid-cols-2">
+            {([1, 2] as ModulePart[]).map((p) => {
+              const bp = blueprintFor(module, p);
+              const on = part === p;
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setPart(p)}
+                  className={`rounded-[8px] border p-[14px] text-left ${
+                    on ? "border-bb-blue bg-bb-blue/6" : "border-black/15 hover:border-bb-ink"
+                  }`}
+                >
+                  <span className="flex items-center gap-[8px] text-[16px] font-bold text-bb-ink">
+                    Module {p}
+                    {p === 2 && (
+                      <span className="rounded-full bg-bb-ink px-[8px] py-[2px] text-[11px] font-bold uppercase tracking-wide text-white">
+                        Hard
+                      </span>
+                    )}
+                  </span>
+                  <span className="mt-[5px] block text-[13px] leading-[1.45] text-black/50">
+                    {bp.blurb}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <dl className="mt-[18px] flex flex-wrap gap-x-[26px] gap-y-[8px] text-[14px]">
+            {[
+              ["Questions", String(blueprint.questions)],
+              ["Time", `${Math.round(blueprint.seconds / 60)} min`],
+              [
+                "Per question",
+                `${Math.round(blueprint.seconds / blueprint.questions)}s`,
+              ],
+              ...(blueprint.sprShare > 0
+                ? [["Grid-ins", `${Math.round(blueprint.sprShare * 100)}%`] as const]
+                : []),
+            ].map(([label, value]) => (
+              <div key={label}>
+                <dt className="text-black/45">{label}</dt>
+                <dd className="text-[16px] font-bold tabular-nums text-bb-ink">{value}</dd>
+              </div>
+            ))}
+          </dl>
+
+          <ul className="mt-[16px] space-y-[7px] border-t border-black/8 pt-[14px] text-[14px]">
+            {blueprint.domains.map((d) => (
+              <li key={d.code} className="flex items-center justify-between gap-[14px]">
+                <span className="min-w-0 truncate text-bb-ink">{d.name}</span>
+                <span className="shrink-0 tabular-nums text-black/50">
+                  {d.min === d.max ? d.min : `${d.min}–${d.max}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-[18px] flex flex-col gap-[10px] border-t border-black/8 pt-[16px]">
+            <Toggle
+              checked={excludeSeen}
+              onChange={setExcludeSeen}
+              label="Only questions I haven't seen"
+              hint="Turn off to allow repeats"
+            />
+            {module === "math" && (
+              <Toggle
+                checked={includeLegacy}
+                onChange={setIncludeLegacy}
+                label="Include legacy disclosed items"
+                hint="Older released questions — roughly doubles the math pool"
+              />
+            )}
+          </div>
+        </Card>
+      )}
+
       {/* Topics */}
-      <Card className="mt-[20px] p-[16px] md:p-[24px]">
+      <Card className={`mt-[20px] p-[16px] md:p-[24px] ${mode === "module" ? "hidden" : ""}`}>
         <div className="flex items-baseline justify-between">
           <h2 className="text-[20px] font-bold text-bb-ink">Topics</h2>
           <div className="flex items-center gap-[16px] text-[14px]">
@@ -430,7 +571,7 @@ export function DrillBuilder() {
       </Card>
 
       {/* Options */}
-      <Card className="mt-[20px] p-[16px] md:p-[24px]">
+      <Card className={`mt-[20px] p-[16px] md:p-[24px] ${mode === "module" ? "hidden" : ""}`}>
         <h2 className="text-[20px] font-bold text-bb-ink">Options</h2>
 
         <div className="mt-[16px] flex flex-wrap items-center gap-[10px]">
@@ -506,20 +647,39 @@ export function DrillBuilder() {
       )}
 
       <div className="mt-[24px] flex flex-col items-start gap-[12px] pb-[40px] sm:flex-row sm:items-center sm:gap-[16px]">
-        <button
-          type="button"
-          onClick={() => setTimingOpen(true)}
-          disabled={loading || availableForSelection === 0}
-          className="h-[46px] w-full rounded-full bg-bb-blue px-[30px] text-[17px] font-bold text-white hover:bg-bb-blue-hover disabled:cursor-not-allowed disabled:bg-black/15 disabled:text-black/40 sm:w-auto"
-        >
-          Create drill
-        </button>
-        <span className="text-[15px] text-black/50">
-          {selected.size === 0
-            ? `Mixed ${MODULES[module].name}`
-            : `${selected.size} topic${selected.size === 1 ? "" : "s"}`}{" "}
-          · {count} questions
-        </span>
+        {mode === "module" ? (
+          <>
+            <button
+              type="button"
+              onClick={startModule}
+              disabled={creating}
+              className="h-[46px] w-full rounded-full bg-bb-blue px-[30px] text-[17px] font-bold text-white hover:bg-bb-blue-hover disabled:cursor-not-allowed disabled:bg-black/15 disabled:text-black/40 sm:w-auto"
+            >
+              {creating ? "Assembling…" : "Start module"}
+            </button>
+            <span className="text-[15px] text-black/50">
+              {blueprint.label} · {blueprint.questions} questions ·{" "}
+              {Math.round(blueprint.seconds / 60)} min
+            </span>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => setTimingOpen(true)}
+              disabled={loading || availableForSelection === 0}
+              className="h-[46px] w-full rounded-full bg-bb-blue px-[30px] text-[17px] font-bold text-white hover:bg-bb-blue-hover disabled:cursor-not-allowed disabled:bg-black/15 disabled:text-black/40 sm:w-auto"
+            >
+              Create drill
+            </button>
+            <span className="text-[15px] text-black/50">
+              {selected.size === 0
+                ? `Mixed ${MODULES[module].name}`
+                : `${selected.size} topic${selected.size === 1 ? "" : "s"}`}{" "}
+              · {count} questions
+            </span>
+          </>
+        )}
       </div>
 
       {timingOpen && (

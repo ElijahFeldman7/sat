@@ -17,8 +17,9 @@
  *
  * 1 — initial schema
  * 2 — user_settings, daily_time (daily goal + time on platform)
+ * 3 — drill_sets.kind accepts 'module' (full-length mock modules)
  */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export const SCHEMA_SQL = String.raw`
 -- Schema for the SAT drill app.
@@ -103,7 +104,7 @@ create table if not exists sat.drill_sets (
   assessment_id integer not null,
   module        text not null check (module in ('math', 'rw')),
   kind          text not null default 'topic'
-                  check (kind in ('topic', 'adaptive', 'srs', 'retake')),
+                  check (kind in ('topic', 'adaptive', 'srs', 'retake', 'module')),
   config        jsonb not null,
   status        text not null default 'active' check (status in ('active', 'complete')),
   created_at    timestamptz not null default now(),
@@ -112,6 +113,14 @@ create table if not exists sat.drill_sets (
 );
 
 create index if not exists drill_sets_user_idx on sat.drill_sets (user_id, created_at desc);
+
+-- \`create table if not exists\` leaves an existing table's constraints alone, so
+-- widening the set of kinds has to be spelled out for databases that already
+-- have the table. Drop-then-add is idempotent; the name is the one Postgres
+-- generates for the inline check above.
+alter table sat.drill_sets drop constraint if exists drill_sets_kind_check;
+alter table sat.drill_sets add constraint drill_sets_kind_check
+  check (kind in ('topic', 'adaptive', 'srs', 'retake', 'module'));
 
 create table if not exists sat.drill_questions (
   set_id            uuid not null references sat.drill_sets(id) on delete cascade,

@@ -1,5 +1,6 @@
 import type { Difficulty, ModuleKey } from "@/lib/qbank/types";
 import { MODULES } from "@/lib/qbank/types";
+import { blueprintSlots, type ModuleBlueprint } from "@/lib/qbank/blueprint";
 import {
   createDrillSet,
   dueSrsKeys,
@@ -163,6 +164,248 @@ export async function createDrill(userId: string, input: CreateDrillInput) {
   });
 
   return { id, count: picked.length, requested: input.count };
+}
+
+// ---------------------------------------------------------------------------
+// Mock modules
+// ---------------------------------------------------------------------------
+
+const DIFFICULTY_ORDER: Difficulty[] = ["E", "M", "H"];
+
+/**
+ * Candidates bucketed by `domain|difficulty`, with each bucket dealt round-robin
+ * across its skills.
+ *
+ * Without the interleave a domain's whole quota can land on one skill — eight
+ * Craft and Structure questions that are all Words in Context is not what the
+ * real module looks like, even though the domain total is right.
+ */
+function bucketPool(candidates: CandidateRow[]): Map<string, CandidateRow[]> {
+  const buckets = new Map<string, Map<string, CandidateRow[]>>();
+
+  for (const c of candidates) {
+    const key = `${c.domain_code}|${c.difficulty}`;
+    const bySkill = buckets.get(key) ?? new Map<string, CandidateRow[]>();
+    const skill = bySkill.get(c.skill_name) ?? [];
+    skill.push(c);
+    bySkill.set(c.skill_name, skill);
+    buckets.set(key, bySkill);
+  }
+
+  const out = new Map<string, CandidateRow[]>();
+  for (const [key, bySkill] of buckets) {
+    const lists = [...bySkill.values()];
+    const interleaved: CandidateRow[] = [];
+    for (let round = 0; interleaved.length < lists.reduce((n, l) => n + l.length, 0); round++) {
+      for (const list of lists) if (round < list.length) interleaved.push(list[round]);
+    }
+    out.set(key, interleaved);
+  }
+  return out;
+}
+
+/**
+ * Bucket keys to try for one slot, best first: the exact cell, then the same
+ * domain at a neighbouring difficulty, then the same difficulty elsewhere, then
+ * anything at all. A thin pool degrades one axis at a time instead of collapsing
+ * to whatever is left.
+ */
+function fallbackOrder(
+  domain: string,
+  difficulty: Difficulty,
+  domains: string[],
+): string[] {
+  const others = DIFFICULTY_ORDER.filter((d) => d !== difficulty).sort(
+    (a, b) =>
+      Math.abs(DIFFICULTY_ORDER.indexOf(a) - DIFFICULTY_ORDER.indexOf(difficulty)) -
+      Math.abs(DIFFICULTY_ORDER.indexOf(b) - DIFFICULTY_ORDER.indexOf(difficulty)),
+  );
+
+  return [
+    `${domain}|${difficulty}`,
+    ...others.map((d) => `${domain}|${d}`),
+    ...domains.filter((d) => d !== domain).map((d) => `${d}|${difficulty}`),
+    ...domains.flatMap((d) => others.map((o) => `${d}|${o}`)),
+  ];
+}
+
+interface ModuleSlot {
+  domain: string;
+  difficulty: Difficulty;
+  /** Math modules put a fixed share of grid-ins at the end of the module. */
+  wantSpr: boolean;
+}
+
+/** Marks `sprShare` of the slots as student-produced, spread over the module. */
+function markSprSlots(
+  slots: { domain: string; difficulty: Difficulty }[],
+  sprShare: number,
+): ModuleSlot[] {
+  const target = Math.round(slots.length * sprShare);
+  const picked = new Set<number>();
+  const order = slots.map((_, i) => i).sort(() => Math.random() - 0.5);
+  for (const i of order.slice(0, target)) picked.add(i);
+  return slots.map((s, i) => ({ ...s, wantSpr: picked.has(i) }));
+}
+
+/**
+ * Fills a blueprint's slots from the candidate pool.
+ *
+ * `taken` carries across calls so the retry pass — which runs after the bodies
+ * come back and some turn out to be ungradable — never re-offers a question the
+ * module already holds or has already rejected.
+ */
+function fillSlots(
+  slots: ModuleSlot[],
+  pool: Map<string, CandidateRow[]>,
+  domains: string[],
+  taken: Set<string>,
+): (CandidateRow | null)[] {
+  return slots.map((slot) => {
+    const keys = fallbackOrder(slot.domain, slot.difficulty, domains);
+
+    // Two sweeps: the first insists on the slot's question type, the second
+    // accepts anything. An unknown type is a maybe, so it satisfies neither
+    // sweep's preference outright but is taken on the second.
+    for (const strict of [true, false]) {
+      for (const key of keys) {
+        for (const candidate of pool.get(key) ?? []) {
+          if (taken.has(candidate.key)) continue;
+          if (strict) {
+            const isSpr = candidate.known_type === "spr";
+            if (candidate.known_type === null || isSpr !== slot.wantSpr) continue;
+          }
+          taken.add(candidate.key);
+          return candidate;
+        }
+      }
+    }
+    return null;
+  });
+}
+
+/**
+ * Builds one module of a digital SAT section against its published blueprint:
+ * the right number of questions, split across content domains and difficulties
+ * the way a real form is, ordered the way Bluebook orders them, on the real
+ * clock.
+ *
+ * Questions come from the same pool every other drill draws on, and record
+ * attempts the same way, so a mock module feeds topic accuracy, pacing medians
+ * and the review queue exactly as a hand-built drill does.
+ */
+export async function createModuleDrill(
+  userId: string,
+  input: {
+    assessmentId: number;
+    blueprint: ModuleBlueprint;
+    includeLegacy: boolean;
+    excludeSeen: boolean;
+  },
+) {
+  const { blueprint: bp } = input;
+
+  const candidates = await listCandidates({
+    assessmentId: input.assessmentId,
+    module: bp.module,
+    includeLegacy: input.includeLegacy && bp.module === "math",
+    excludeSeenFor: input.excludeSeen ? userId : null,
+  });
+
+  if (candidates.length < bp.questions) {
+    throw new Error(
+      `Not enough unused ${MODULES[bp.module].name} questions left for a full module. ` +
+        "Turn off “only questions I haven’t seen” to allow repeats.",
+    );
+  }
+
+  const pool = bucketPool(candidates);
+  const domains = bp.domains.map((d) => d.code);
+  const slots = markSprSlots(blueprintSlots(bp), bp.sprShare);
+  const taken = new Set<string>();
+
+  const filled = fillSlots(slots, pool, domains, taken);
+  const details = await loadDetails(filled.filter((c): c is CandidateRow => c !== null));
+
+  /** A slot is only done when its question came back and can be scored. */
+  const usableAt = (c: CandidateRow | null) => {
+    const detail = c && details.get(c.key);
+    return !!detail && isGradable(detail);
+  };
+
+  // Some items fail to fetch, and a few legacy ones ship with no answer key.
+  // Re-run just the slots that came back unusable, against the same pool.
+  for (let round = 0; round < 3; round++) {
+    const bad = filled.map((c, i) => ({ c, i })).filter(({ c }) => !usableAt(c));
+    if (bad.length === 0) break;
+
+    const replacements = fillSlots(
+      bad.map(({ i }) => slots[i]),
+      pool,
+      domains,
+      taken,
+    );
+    const fresh = replacements.filter((c): c is CandidateRow => c !== null);
+    if (fresh.length === 0) break;
+
+    const more = await loadDetails(fresh);
+    for (const [key, value] of more) details.set(key, value);
+    bad.forEach(({ i }, n) => {
+      if (replacements[n]) filled[i] = replacements[n];
+    });
+  }
+
+  const usable = filled.filter((c): c is CandidateRow => usableAt(c));
+
+  if (usable.length === 0) {
+    throw new Error("Could not load any questions from the question bank. Try again.");
+  }
+
+  /*
+   * On-screen order. Reading and Writing runs whole domains at a time, easiest
+   * first inside each. Math mixes domains, climbs in difficulty, and keeps every
+   * grid-in for the end of the module — which is exactly where Bluebook puts
+   * them.
+   */
+  const ordered = [...usable].sort((a, b) => {
+    if (bp.module === "rw") {
+      const byDomain = bp.order.indexOf(a.domain_code) - bp.order.indexOf(b.domain_code);
+      if (byDomain !== 0) return byDomain;
+    } else {
+      const aSpr = details.get(a.key)!.type === "spr";
+      const bSpr = details.get(b.key)!.type === "spr";
+      if (aSpr !== bSpr) return aSpr ? 1 : -1;
+    }
+
+    return (
+      DIFFICULTY_ORDER.indexOf(a.difficulty) - DIFFICULTY_ORDER.indexOf(b.difficulty)
+    );
+  });
+
+  const config: DrillConfig = {
+    // One block for the whole module, like the real thing. No per-skill budgets:
+    // the point of a mock is the test's pacing, not the student's usual pace.
+    timingMode: "total",
+    totalSeconds: bp.seconds,
+    secondsPerQuestion: Math.round(bp.seconds / bp.questions),
+    skills: [],
+    difficulties: [],
+    includeLegacy: input.includeLegacy,
+    excludeSeen: input.excludeSeen,
+    blueprintId: bp.id,
+  };
+
+  const id = await createDrillSet({
+    userId,
+    name: bp.label,
+    assessmentId: input.assessmentId,
+    module: bp.module,
+    kind: "module",
+    config,
+    questionKeys: ordered.map((c) => c.key),
+  });
+
+  return { id, count: ordered.length, requested: bp.questions };
 }
 
 /** The skills to target for an adaptive drill, weakest first. */

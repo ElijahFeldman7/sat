@@ -121,7 +121,13 @@ function availableQuestions(filter: QuestionFilter, extraSql = "", extraParams: 
   }
 
   return {
-    sql: `FROM questions q WHERE ${where.join(" AND ")} ${extraSql}`,
+    // The join is to one row at most (`key` is the detail table's primary key),
+    // so it cannot change a count — it only carries the cached question type
+    // along, which is what lets a module blueprint aim for its share of
+    // student-produced responses without fetching every candidate first.
+    sql: `FROM questions q
+          LEFT JOIN question_details qd ON qd.key = q.key
+          WHERE ${where.join(" AND ")} ${extraSql}`,
     params: [...params, ...extraParams],
   };
 }
@@ -129,11 +135,14 @@ function availableQuestions(filter: QuestionFilter, extraSql = "", extraParams: 
 export interface CandidateRow {
   key: string;
   skill_name: string;
+  domain_code: string;
   domain_name: string;
   difficulty: Difficulty;
   source: string;
   ibn: string | null;
   external_id: string | null;
+  /** 'mcq' | 'spr' when the body has been cached, null when it hasn't. */
+  known_type: "mcq" | "spr" | null;
 }
 
 export async function countAvailable(filter: QuestionFilter): Promise<number> {
@@ -148,7 +157,8 @@ export async function listCandidates(
 ): Promise<CandidateRow[]> {
   const { sql: from, params } = availableQuestions(filter, "ORDER BY RANDOM() LIMIT ?", [limit]);
   return all<CandidateRow>(
-    `SELECT q.key, q.skill_name, q.domain_name, q.difficulty, q.source, q.ibn, q.external_id ${from}`,
+    `SELECT q.key, q.skill_name, q.domain_code, q.domain_name, q.difficulty,
+            q.source, q.ibn, q.external_id, qd.type AS known_type ${from}`,
     params,
   );
 }
@@ -511,6 +521,8 @@ export interface DrillConfig {
   difficulties: Difficulty[];
   includeLegacy: boolean;
   excludeSeen: boolean;
+  /** Set on `kind: 'module'` drills — which test-form blueprint built this. */
+  blueprintId?: string;
 }
 
 export interface DrillSetRow {

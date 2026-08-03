@@ -77,7 +77,14 @@ export function ExamHeader({
           >
             {clockHidden ? "Show" : "Hide"}
           </button>
-          {pacing && <PacingIndicator {...pacing} />}
+          {/* "Hide" is about not watching a clock, so it takes the pacing ring
+              with it. Invisible rather than unmounted, so the header doesn't
+              jump as it comes and goes. */}
+          {pacing && (
+            <span className={clockHidden ? "invisible" : ""}>
+              <PacingIndicator {...pacing} />
+            </span>
+          )}
         </div>
       </div>
 

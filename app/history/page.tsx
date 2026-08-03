@@ -53,7 +53,8 @@ export default async function HistoryPage() {
                       })}{" "}
                       · {MODULES[s.module].name} · {s.total} questions ·{" "}
                       {fmtDuration(s.time_ms ?? 0)}
-                      {s.kind !== "topic" && ` · ${s.kind}`}
+                      {/* A module's name already reads "Math · Module 2". */}
+                      {s.kind !== "topic" && s.kind !== "module" && ` · ${s.kind}`}
                     </div>
                   </div>
 

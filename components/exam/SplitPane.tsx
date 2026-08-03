@@ -51,7 +51,7 @@ export function SplitPane({
   if (singleColumn) {
     return (
       <div className="h-full overflow-y-auto bb-scroll">
-        <div className="mx-auto h-full max-w-[720px] px-[20px] pt-[18px] md:px-[40px] md:pt-[24px]">
+        <div className="@container mx-auto h-full max-w-[720px] px-[20px] pb-[40px] pt-[18px] md:px-[40px] md:pt-[24px]">
           {right}
         </div>
       </div>
@@ -113,7 +113,7 @@ export function SplitPane({
           pane === "question" ? "" : "hidden"
         }`}
       >
-        <div className="px-[20px] pb-[24px] pt-[16px] md:px-[43px] md:pb-[40px] md:pt-[22px]">
+        <div className="@container px-[20px] pb-[24px] pt-[16px] md:px-[43px] md:pb-[40px] md:pt-[22px]">
           {right}
         </div>
       </div>

@@ -13,7 +13,7 @@ export default async function LandingPage() {
         <LogoLockup />
       </header>
 
-      <main className="flex flex-1 items-center justify-center px-6">
+      <main className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-6 bb-scroll">
         <div className="w-full max-w-[520px] text-center">
           <SatBadge className="mx-auto mb-[22px] h-[60px] w-[60px] sm:mb-[28px] sm:h-[76px] sm:w-[76px]" />
           <h2 className="text-[30px] font-bold leading-[1.12] tracking-[-0.02em] text-bb-ink sm:text-[42px]">

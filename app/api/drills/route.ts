@@ -3,14 +3,17 @@ import { handle } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { ensureCatalog } from "@/lib/db/sync";
 import { listDrillSets } from "@/lib/db/queries";
-import { createDrill, createSrsDrill, weakestSkills } from "@/lib/drills";
+import { createDrill, createModuleDrill, createSrsDrill, weakestSkills } from "@/lib/drills";
+import { blueprintFor, type ModulePart } from "@/lib/qbank/blueprint";
 import { DEFAULT_ASSESSMENT_ID, type Difficulty, type ModuleKey } from "@/lib/qbank/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 interface Body {
-  kind?: "topic" | "adaptive" | "srs";
+  kind?: "topic" | "adaptive" | "srs" | "module";
+  /** Which half of the section, for `kind: 'module'`. */
+  part?: number;
   assessment?: number;
   module?: ModuleKey;
   skills?: string[];
@@ -47,6 +50,18 @@ export async function POST(req: NextRequest) {
       totalSeconds: body.totalSeconds,
       secondsPerSkill: Object.keys(secondsPerSkill).length ? secondsPerSkill : undefined,
     } as const;
+
+    // A mock module owns its own question count, blueprint and clock, so none
+    // of the drill-builder inputs above apply to it.
+    if (body.kind === "module") {
+      const part: ModulePart = body.part === 1 ? 1 : 2;
+      return createModuleDrill(user.id, {
+        assessmentId,
+        blueprint: blueprintFor(moduleKey, part),
+        includeLegacy: body.includeLegacy ?? true,
+        excludeSeen: body.excludeSeen ?? true,
+      });
+    }
 
     if (body.kind === "srs") {
       return createSrsDrill(user.id, assessmentId, moduleKey, count, timing);

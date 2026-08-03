@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { MODULES } from "@/lib/qbank/types";
+import { blueprintById } from "@/lib/qbank/blueprint";
 import { ChoiceList } from "./ChoiceList";
 import { DEFAULT_DESMOS_WIDTH, DesmosPanel, loadDesmosWidth } from "./DesmosPanel";
 import { ExamFooter } from "./ExamFooter";
@@ -90,14 +91,20 @@ export function ExamShell({
     return () => clearInterval(id);
   }, []);
 
-  const liveQuestionMs = onReviewPage
-    ? (current?.timeSpentMs ?? 0)
-    : stopwatch.base + (now - stopwatch.startedAt);
+  const liveQuestionMs = stopwatch.base + (now - stopwatch.startedAt);
 
-  const sectionElapsedMs =
+  /**
+   * Section time that is already banked: every question's stored time, minus
+   * whatever is stored for the one on screen (the stopwatch owns that). It only
+   * moves when the student navigates, which makes it a stable base to schedule
+   * the module deadline against.
+   */
+  const bankedMs =
     questions.reduce((sum, q) => sum + q.timeSpentMs, 0) -
     (current?.timeSpentMs ?? 0) +
-    liveQuestionMs;
+    stopwatch.base;
+
+  const sectionElapsedMs = bankedMs + (now - stopwatch.startedAt);
 
   const { timingMode, secondsPerQuestion, totalSeconds, secondsPerSkill } = set.config;
 
@@ -264,6 +271,22 @@ export function ExamShell({
     }
   }, [commitTime, flush, router, set.id]);
 
+  /**
+   * A mock module ends when its clock does — that is the whole point of running
+   * one. Every other drill keeps going: a topic set's clock is a pacing target,
+   * not a gate, and cutting one off at zero would change how they work.
+   *
+   * One timer set for the exact remaining milliseconds, rather than a check on
+   * every 250ms tick. `bankedMs` and the stopwatch only change on navigation, so
+   * this reschedules a handful of times over a 35-minute module.
+   */
+  useEffect(() => {
+    if (set.kind !== "module" || timingMode !== "total" || totalBudgetMs <= 0) return;
+    const deadline = stopwatch.startedAt + totalBudgetMs - bankedMs;
+    const id = setTimeout(() => void submit(), Math.max(0, deadline - Date.now()));
+    return () => clearTimeout(id);
+  }, [bankedMs, set.kind, stopwatch.startedAt, submit, timingMode, totalBudgetMs]);
+
   const onNext = useCallback(() => {
     if (onReviewPage) {
       void submit();
@@ -346,19 +369,44 @@ export function ExamShell({
   }, [current, isMath, onBack, onNext, selectAnswer, toggleMark]);
 
   const navItems = useMemo(() => toNavItems(questions), [questions]);
-  const sectionTitle = `Section 1: ${MODULES[set.module].name} Questions`;
+
+  const blueprint = blueprintById(set.config.blueprintId);
+  const headerTitle = blueprint
+    ? `Section 1, Module ${blueprint.part}: ${MODULES[set.module].name}`
+    : `Section 1: ${MODULES[set.module].name}`;
+  const sectionTitle = `${headerTitle} Questions`;
 
   // Bluebook's banner is a single short label, not a breadcrumb — the drill's
   // topics and difficulty already live on the results and history pages.
-  const bannerText =
-    set.kind === "srs"
+  const bannerText = blueprint
+    ? blueprint.banner
+    : set.kind === "srs"
       ? "Review Misses"
       : set.kind === "adaptive"
         ? "Weak Spots"
         : "Practice Drill";
 
   const body = current?.body;
-  const hasStimulus = !!body?.stimulus?.trim();
+  const stimulus = body?.stimulus?.trim() ? body.stimulus : null;
+
+  /**
+   * Only Reading and Writing splits the screen. Bluebook lays a math question
+   * out in one column with its figure, table or equations sitting directly
+   * above the stem — pushing a two-line system of inequalities to the far side
+   * of a divider puts the thing you're reasoning about a screen away from the
+   * question that asks about it.
+   */
+  const splitScreen = !isMath && stimulus !== null;
+
+  const stimulusBlock = stimulus && (
+    <div
+      ref={stimulusRef}
+      onMouseUp={onMouseUp}
+      className={highlightsOn ? "cursor-text selection:bg-[#ffe484]" : ""}
+    >
+      <QuestionHtml html={highlightHtml ?? stimulus} />
+    </div>
+  );
 
   const moreItems = useMemo<MoreMenuItem[]>(
     () => [
@@ -407,7 +455,7 @@ export function ExamShell({
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <ExamHeader
-        title={`Section 1: ${MODULES[set.module].name}`}
+        title={headerTitle}
         clockMs={clockMs}
         clockHidden={clockHidden}
         onToggleClock={() => setClockHidden((v) => !v)}
@@ -444,20 +492,12 @@ export function ExamShell({
             </div>
           ) : (
             <SplitPane
-              singleColumn={!hasStimulus}
+              singleColumn={!splitScreen}
               pane={pane}
               onPaneChange={setPane}
-              passageLabel={isMath ? "Figure" : "Passage"}
+              passageLabel="Passage"
               answered={!!current.userAnswer}
-              left={
-                <div
-                  ref={stimulusRef}
-                  onMouseUp={onMouseUp}
-                  className={highlightsOn ? "cursor-text selection:bg-[#ffe484]" : ""}
-                >
-                  <QuestionHtml html={highlightHtml ?? body.stimulus} />
-                </div>
-              }
+              left={splitScreen ? stimulusBlock : null}
               right={
                 <div>
                   <QuestionHeader
@@ -467,6 +507,9 @@ export function ExamShell({
                     crossOutMode={crossOutMode}
                     onToggleCrossOut={() => setCrossOutMode((v) => !v)}
                   />
+                  {!splitScreen && stimulusBlock && (
+                    <div className="pt-[18px]">{stimulusBlock}</div>
+                  )}
                   <div className="pt-[18px]">
                     <QuestionHtml html={body.stem} />
                   </div>
@@ -535,11 +578,13 @@ export function ExamShell({
               : "Each question includes a passage or passages. Read each passage, then choose the best answer to the question based on what is stated or implied."}
           </p>
           <p className="mt-[14px] text-black/70">
-            {timingMode === "per-question"
-              ? `Pacing target: ${secondsPerQuestion}s per question. The ring next to the clock tracks the current question only — it never moves you on.`
-              : timingMode === "total"
-                ? `You have ${Math.round((totalSeconds ?? 0) / 60)} minutes for all ${total} questions.`
-                : "This drill is untimed; the clock counts up."}
+            {blueprint
+              ? `${Math.round(blueprint.seconds / 60)} minutes for ${total} questions, built to the shape of a real ${blueprint.part === 2 ? "upper-tier " : ""}Module ${blueprint.part}. The module submits itself when the clock runs out.`
+              : timingMode === "per-question"
+                ? `Pacing target: ${secondsPerQuestion}s per question. The ring next to the clock tracks the current question only — it never moves you on.`
+                : timingMode === "total"
+                  ? `You have ${Math.round((totalSeconds ?? 0) / 60)} minutes for all ${total} questions.`
+                  : "This drill is untimed; the clock counts up."}
           </p>
         </Modal>
       )}

@@ -31,9 +31,16 @@
   color-scheme: light;
 }
 
+/*
+ * Every route is a full-height flex shell with its own inner scroll container
+ * (AppShell's <main>, the exam's split panes). The document itself must never
+ * scroll: when it does, the browser paints a second scrollbar next to the one
+ * that actually moves the content.
+ */
 html,
 body {
   height: 100%;
+  overflow: hidden;
 }
 
 body {
