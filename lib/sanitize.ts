@@ -132,8 +132,21 @@ export function sanitizeQuestionHtml(html: string | null | undefined): string {
   // and goes through DOMPurify like everything else.
   return DOMPurify.sanitize(modernizeMathML(inlineMathImages(html)), {
     USE_PROFILES: { html: true, mathMl: true, svg: true },
-    // data-hl / data-note carry the student's highlight colour and note.
-    ADD_ATTR: ["align", "border", "scope", "colspan", "rowspan", "alttext", "role", "data-hl", "data-note"],
+    // data-hl / data-ul / data-note / data-nid carry the student's highlight
+    // colour, its underline, and the note tied to it.
+    ADD_ATTR: [
+      "align",
+      "border",
+      "scope",
+      "colspan",
+      "rowspan",
+      "alttext",
+      "role",
+      "data-hl",
+      "data-ul",
+      "data-note",
+      "data-nid",
+    ],
     ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|data):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
   });
 }

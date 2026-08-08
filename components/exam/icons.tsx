@@ -244,3 +244,100 @@ export function ExitIcon({ className = "" }: { className?: string }) {
     </svg>
   );
 }
+
+/**
+ * The droplet Bluebook puts inside the swatch that is currently armed, so the
+ * toolbar shows which colour a selection will get.
+ */
+export function DropletIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path
+        d="M12 3.4c3.5 4.1 5.5 6.8 5.5 9.4a5.5 5.5 0 0 1-11 0c0-2.6 2-5.3 5.5-9.4Z"
+        fill="currentColor"
+        stroke="#1e1e1e"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** A U over the three line styles, for the underline menu's button. */
+export function UnderlineStylesIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <g fill="none" stroke="currentColor" strokeLinecap="round">
+        <path d="M7 2.8v6.4a5 5 0 0 0 10 0V2.8" strokeWidth="1.9" />
+        <path d="M5.6 14.6h12.8" strokeWidth="1.6" />
+        <path d="M5.6 18.2h12.8" strokeWidth="1.6" strokeDasharray="3.2 2.4" />
+        <path d="M5.6 21.8h12.8" strokeWidth="1.6" strokeDasharray="0.1 3" />
+      </g>
+    </svg>
+  );
+}
+
+/** A U with one line under it, in the style being offered or applied. */
+export function UnderlineIcon({
+  kind = "solid",
+  className = "",
+}: {
+  kind?: "solid" | "dashed" | "dotted";
+  className?: string;
+}) {
+  const dashes = kind === "dashed" ? "3.2 2.4" : kind === "dotted" ? "0.1 3" : undefined;
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <g fill="none" stroke="currentColor" strokeLinecap="round">
+        <path d="M7 3.6v7a5 5 0 0 0 10 0v-7" strokeWidth="1.9" />
+        <path d="M5.6 19.4h12.8" strokeWidth="1.8" strokeDasharray={dashes} />
+      </g>
+    </svg>
+  );
+}
+
+/**
+ * Bluebook's add-note button: a sticky note with a turned-up corner, in the
+ * colour of the highlight the note would be attached to.
+ */
+export function StickyNoteIcon({
+  fill = "#fdf0b4",
+  className = "",
+}: {
+  fill?: string;
+  className?: string;
+}) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path
+        d="M4.6 4.6h14.8v10.2l-4.6 4.6H4.6z"
+        fill={fill}
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M19.4 14.8h-4.6v4.6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path d="M11.7 8v6M8.7 11h6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** The trash can on the selection toolbar. */
+export function TrashIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <g {...stroke}>
+        <path d="M4 6.5h16" />
+        <path d="M9.5 6.5V4.6h5v1.9" />
+        <path d="M6.3 6.5 7.2 20h9.6l.9-13.5" />
+        <path d="M10.3 10v6M13.7 10v6" />
+      </g>
+    </svg>
+  );
+}
