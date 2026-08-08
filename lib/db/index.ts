@@ -37,10 +37,15 @@ export function sql(): postgres.Sql {
   if (client) return client;
 
   const url = connectionString();
-  const isTransactionMode = new URL(url).port === "6543";
+  const { hostname, port } = new URL(url);
+  const isTransactionMode = port === "6543";
+  // Supabase only accepts TLS; a Postgres running on the developer's own
+  // machine usually has it switched off, and demanding it there fails the
+  // connection outright.
+  const isLocal = ["localhost", "127.0.0.1", "[::1]", "::1"].includes(hostname);
 
   client = postgres(url, {
-    ssl: "require",
+    ssl: isLocal ? false : "require",
     prepare: !isTransactionMode,
     max: SERVERLESS ? 1 : 5,
     idle_timeout: SERVERLESS ? 10 : 20,

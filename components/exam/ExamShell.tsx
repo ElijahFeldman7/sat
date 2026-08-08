@@ -10,7 +10,15 @@ import { ExamFooter } from "./ExamFooter";
 import { ExamBanner } from "./ExamBanner";
 import { ExamHeader } from "./ExamHeader";
 import type { MoreMenuItem } from "./MoreMenu";
-import { EraserIcon, ExitIcon, HelpIcon, HighlightIcon, KeyboardIcon, ListIcon } from "./icons";
+import {
+  EraserIcon,
+  ExitIcon,
+  HelpIcon,
+  HighlightIcon,
+  KeyboardIcon,
+  ListIcon,
+  NotesIcon,
+} from "./icons";
 import { QuestionHeader } from "./QuestionHeader";
 import { QuestionHtml } from "./QuestionHtml";
 import { QuestionNavPopover, toNavItems } from "./QuestionNav";
@@ -18,7 +26,8 @@ import { ReviewPage } from "./ReviewPage";
 import { SplitPane, type Pane } from "./SplitPane";
 import { SprInput } from "./SprInput";
 import { HighlightToolbar } from "./HighlightToolbar";
-import { useHighlighter } from "./useHighlighter";
+import { NotesPanel } from "./NotesPanel";
+import { useHighlighter, type HighlightPayload } from "./useHighlighter";
 import type { ExamPayload, ExamQuestionState } from "./types";
 
 type Patch = {
@@ -37,7 +46,7 @@ export function ExamShell({
 }: {
   payload: ExamPayload;
   userName: string;
-  highlights: Record<string, string>;
+  highlights: Record<string, HighlightPayload>;
 }) {
   const router = useRouter();
   const { set } = payload;
@@ -55,6 +64,7 @@ export function ExamShell({
   const [navOpen, setNavOpen] = useState(false);
   const [crossOutMode, setCrossOutMode] = useState(false);
   const [highlightsOn, setHighlightsOn] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
   const [clockHidden, setClockHidden] = useState(false);
   const [calcOpen, setCalcOpen] = useState(false);
   const [showDirections, setShowDirections] = useState(false);
@@ -311,19 +321,39 @@ export function ExamShell({
   // ---------------------------------------------------------------- highlights
   const {
     stimulusRef,
+    stemRef,
     highlightHtml,
-    onMouseUp,
+    highlightStem,
     clearHighlights,
     toolbar,
     closeToolbar,
-    applyStyle,
+    applyColor,
+    applyUnderline,
     removeAtSelection,
-    setNote,
+    startNote,
+    style: highlightStyle,
+    underlineKind,
+    notes,
+    editingNote,
+    setEditingNote,
+    saveNote,
+    removeNote,
   } = useHighlighter({
-    enabled: highlightsOn,
+    autoApply: highlightsOn,
     questionKey: current?.key ?? "",
     initial: initialHighlights,
   });
+
+  /**
+   * A question that already has notes opens with its column showing, once. The
+   * key is what makes it once: collapsing it afterwards sticks, until the next
+   * question brings its own notes.
+   */
+  const [notesShownFor, setNotesShownFor] = useState<string | null>(null);
+  if (notes.length && notesShownFor !== current?.key) {
+    setNotesShownFor(current?.key ?? null);
+    setNotesOpen(true);
+  }
 
   // ---------------------------------------------------------------- keyboard
   useEffect(() => {
@@ -399,11 +429,7 @@ export function ExamShell({
   const splitScreen = !isMath && stimulus !== null;
 
   const stimulusBlock = stimulus && (
-    <div
-      ref={stimulusRef}
-      onMouseUp={onMouseUp}
-      className={highlightsOn ? "cursor-text selection:bg-[#ffe484]" : ""}
-    >
+    <div ref={stimulusRef} className="cursor-text">
       <QuestionHtml html={highlightHtml ?? stimulus} />
     </div>
   );
@@ -428,6 +454,12 @@ export function ExamShell({
         onSelect: () => setShowShortcuts(true),
       },
       {
+        label: "Notes",
+        icon: <NotesIcon className="h-[22px] w-[22px]" />,
+        onSelect: () => setNotesOpen((v) => !v),
+        on: notesOpen,
+      },
+      {
         label: "Clear Highlights",
         icon: <EraserIcon className="h-[22px] w-[22px]" />,
         onSelect: clearHighlights,
@@ -449,7 +481,7 @@ export function ExamShell({
         },
       },
     ],
-    [clearHighlights, commitTime, highlightsOn, router],
+    [clearHighlights, commitTime, highlightsOn, notesOpen, router],
   );
 
   return (
@@ -498,6 +530,19 @@ export function ExamShell({
               passageLabel="Passage"
               answered={!!current.userAnswer}
               left={splitScreen ? stimulusBlock : null}
+              notesOpen={notesOpen}
+              noteCount={notes.length}
+              onOpenNotes={() => setNotesOpen(true)}
+              notes={
+                <NotesPanel
+                  notes={notes}
+                  editing={editingNote}
+                  onEdit={setEditingNote}
+                  onSave={saveNote}
+                  onRemove={removeNote}
+                  onCollapse={() => setNotesOpen(false)}
+                />
+              }
               right={
                 <div>
                   <QuestionHeader
@@ -510,8 +555,9 @@ export function ExamShell({
                   {!splitScreen && stimulusBlock && (
                     <div className="pt-[18px]">{stimulusBlock}</div>
                   )}
-                  <div className="pt-[18px]">
-                    <QuestionHtml html={body.stem} />
+                  {/* The question itself is highlightable too, like the passage. */}
+                  <div ref={stemRef} className="cursor-text pt-[18px]">
+                    <QuestionHtml html={highlightStem ?? body.stem} />
                   </div>
                   <div className="pt-[22px]">
                     {body.type === "mcq" ? (
@@ -592,9 +638,16 @@ export function ExamShell({
       {toolbar && (
         <HighlightToolbar
           state={toolbar}
-          onApply={applyStyle}
+          armed={highlightStyle}
+          underlineKind={underlineKind}
+          onColor={applyColor}
+          onUnderline={applyUnderline}
           onRemove={removeAtSelection}
-          onNote={setNote}
+          onNote={() => {
+            // A new note is written in its card, so the column has to be open.
+            startNote();
+            setNotesOpen(true);
+          }}
           onClose={closeToolbar}
         />
       )}

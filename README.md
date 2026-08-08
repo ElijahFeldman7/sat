@@ -29,6 +29,20 @@ The schema is created automatically on first query. Everything lives in a `sat`
 schema that is not exposed to the Supabase Data API, with RLS enabled on every
 table as defence in depth.
 
+### Signing in locally
+
+Google is not needed to click around. With `AUTH_SECRET` and a database URL set,
+`next dev` running:
+
+```
+http://localhost:3000/api/dev-login
+```
+
+signs in a fixed `dev-local-user` and redirects to the dashboard
+(`?next=/history` to land elsewhere). Only `GOOGLE_CLIENT_ID` /
+`GOOGLE_CLIENT_SECRET` are optional in that case; the route answers 404 under
+`NODE_ENV=production`, so it exists only under `next dev`.
+
 **Bump `SCHEMA_VERSION` in `lib/db/schema.ts` whenever you add to `SCHEMA_SQL`.**
 `ready()` compares it against the version recorded in the database and only then
 runs the DDL — without a bump, a new table is never created on a database that

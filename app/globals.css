@@ -207,14 +207,43 @@ body {
   background: #f9d3e6;
 }
 
-.qbank mark.bb-hl[data-hl="underline"] {
+/*
+ * An underline is a layer over the fill, not a colour of its own: Bluebook has
+ * no way to underline text without highlighting it, so `data-ul` only ever adds
+ * a rule to whatever colour `data-hl` already set.
+ */
+.qbank mark.bb-hl[data-ul] {
+  border-bottom: 2px solid var(--color-bb-ink);
+}
+
+.qbank mark.bb-hl[data-ul="dashed"] {
+  border-bottom-style: dashed;
+}
+
+.qbank mark.bb-hl[data-ul="dotted"] {
+  border-bottom-style: dotted;
+}
+
+/*
+ * Marks saved while underline was still a colour of its own, before it became a
+ * layer. They keep rendering as they were written; touching one rewrites it into
+ * the current form.
+ */
+.qbank mark.bb-hl[data-hl^="underline"] {
   background: transparent;
   border-bottom: 2px solid var(--color-bb-ink);
 }
 
-/* A note is invisible on its own, so annotated marks get a dog-ear. */
+.qbank mark.bb-hl[data-hl="underline-dashed"] {
+  border-bottom-style: dashed;
+}
+
+.qbank mark.bb-hl[data-hl="underline-dotted"] {
+  border-bottom-style: dotted;
+}
+
+/* A note is listed in the notes panel; the highlight itself stays plain. */
 .qbank mark.bb-hl[data-note] {
-  border-bottom: 2px dotted var(--color-bb-blue);
   cursor: help;
 }
 

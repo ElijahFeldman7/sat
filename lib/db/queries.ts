@@ -967,8 +967,24 @@ export async function dailyActivity(userId: string, days = 30) {
 // Annotations (passage highlights)
 // ---------------------------------------------------------------------------
 
-export async function saveHighlight(userId: string, questionKey: string, html: string | null) {
-  if (html === null) {
+/**
+ * A question's highlighted markup, one blob per region: the passage and the
+ * question itself are both highlightable and are stored separately, since they
+ * render into different panes. `html` is the passage's, under its original name
+ * so rows written before the question was highlightable still load.
+ */
+export interface HighlightPayload {
+  html?: string | null;
+  stem?: string | null;
+}
+
+export async function saveHighlight(
+  userId: string,
+  questionKey: string,
+  payload: HighlightPayload | null,
+) {
+  const empty = !payload || (!payload.html && !payload.stem);
+  if (empty) {
     await run(
       "DELETE FROM annotations WHERE user_id = ? AND question_key = ? AND kind = 'highlight'",
       [userId, questionKey],
@@ -979,21 +995,26 @@ export async function saveHighlight(userId: string, questionKey: string, html: s
     `INSERT INTO annotations (user_id, question_key, kind, payload)
      VALUES (?, ?, 'highlight', ?::text::jsonb)
      ON CONFLICT (user_id, question_key, kind) DO UPDATE SET payload = excluded.payload`,
-    [userId, questionKey, JSON.stringify({ html })],
+    [userId, questionKey, JSON.stringify({ html: payload.html ?? null, stem: payload.stem ?? null })],
   );
 }
 
 export async function getHighlights(
   userId: string,
   questionKeys: string[],
-): Promise<Record<string, string>> {
+): Promise<Record<string, HighlightPayload>> {
   if (questionKeys.length === 0) return {};
-  const rows = await all<{ question_key: string; payload: { html: string } }>(
+  const rows = await all<{ question_key: string; payload: HighlightPayload }>(
     `SELECT question_key, payload FROM annotations
      WHERE user_id = ? AND kind = 'highlight' AND question_key = ANY(?)`,
     [userId, questionKeys],
   );
-  return Object.fromEntries(rows.map((r) => [r.question_key, r.payload.html]));
+  return Object.fromEntries(
+    rows.map((r) => [
+      r.question_key,
+      { html: r.payload.html ?? null, stem: r.payload.stem ?? null },
+    ]),
+  );
 }
 
 // ---------------------------------------------------------------------------

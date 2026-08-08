@@ -3,12 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { GrabberIcon } from "./icons";
 
-export type Pane = "passage" | "question";
+export type Pane = "passage" | "question" | "notes";
 
 
 export function SplitPane({
   left,
   right,
+  notes,
+  notesOpen,
+  noteCount,
+  onOpenNotes,
   singleColumn,
   pane,
   onPaneChange,
@@ -17,6 +21,11 @@ export function SplitPane({
 }: {
   left: React.ReactNode;
   right: React.ReactNode;
+  /** The notes column, shown between the two panes while it is open. */
+  notes?: React.ReactNode;
+  notesOpen?: boolean;
+  noteCount?: number;
+  onOpenNotes?: () => void;
   singleColumn?: boolean;
   pane: Pane;
   onPaneChange: (pane: Pane) => void;
@@ -68,6 +77,11 @@ export function SplitPane({
         <PaneTab active={pane === "passage"} onClick={() => onPaneChange("passage")}>
           {passageLabel}
         </PaneTab>
+        {notesOpen && (
+          <PaneTab active={pane === "notes"} onClick={() => onPaneChange("notes")}>
+            Notes{noteCount ? ` (${noteCount})` : ""}
+          </PaneTab>
+        )}
         <PaneTab active={pane === "question"} onClick={() => onPaneChange("question")}>
           Question
           {answered && (
@@ -90,6 +104,32 @@ export function SplitPane({
           {left}
         </div>
       </div>
+
+      {notesOpen && (
+        <div
+          className={`min-h-0 flex-1 border-x border-black/15 md:block md:h-full md:w-[320px] md:flex-none ${
+            pane === "notes" ? "" : "hidden md:block"
+          }`}
+        >
+          {notes}
+        </div>
+      )}
+
+      {/*
+        Collapsed notes reopen from a handle on the divider, as in Bluebook. It
+        sits low down to stay clear of the resize grabber at the rule's middle.
+      */}
+      {!notesOpen && !!noteCount && onOpenNotes && (
+        <button
+          type="button"
+          onClick={onOpenNotes}
+          aria-label={`Open notes (${noteCount})`}
+          title={`Notes (${noteCount})`}
+          className="mb-[10%] hidden shrink-0 items-center self-end rounded-l-[6px] bg-black/45 px-[3px] py-[12px] text-white hover:bg-black/60 md:flex"
+        >
+          <ChevronLeftIcon className="h-[16px] w-[16px]" />
+        </button>
+      )}
 
       {/* Vertical rule + grabber, desktop only — the tabs replace it on phones. */}
       <div className="relative hidden w-0 shrink-0 md:block">
@@ -118,6 +158,22 @@ export function SplitPane({
         </div>
       </div>
     </div>
+  );
+}
+
+/** The chevron on the collapsed-notes handle. */
+function ChevronLeftIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path
+        d="M14.5 6 8.5 12l6 6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
