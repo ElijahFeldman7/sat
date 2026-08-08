@@ -31,6 +31,31 @@ function connectionString(): string {
   return url;
 }
 
+const LOCAL_HOSTS = ["localhost", "127.0.0.1", "[::1]", "::1"];
+
+export interface DbTarget {
+  host: string;
+  database: string;
+  /** True for a database on this machine, which is safe to write to freely. */
+  isLocal: boolean;
+}
+
+/**
+ * Which database this process is pointed at.
+ *
+ * Worth being able to ask: the same code runs against a throwaway local
+ * Postgres and against the live one, the choice is made by whichever `.env`
+ * file won, and scripts that write test data need to know the difference.
+ */
+export function dbTarget(): DbTarget {
+  const { hostname, pathname } = new URL(connectionString());
+  return {
+    host: hostname,
+    database: pathname.replace(/^\//, "") || "postgres",
+    isLocal: LOCAL_HOSTS.includes(hostname),
+  };
+}
+
 let client: postgres.Sql | null = null;
 
 export function sql(): postgres.Sql {
@@ -38,6 +63,13 @@ export function sql(): postgres.Sql {
 
   const url = connectionString();
   const { hostname, port } = new URL(url);
+
+  // Which database a process is talking to should never be a guess — the local
+  // and the live one hold the same shape of data and differ only in the URL.
+  const target = dbTarget();
+  console.log(
+    `[db] ${target.isLocal ? "local" : "REMOTE"} → ${target.host}/${target.database}`,
+  );
   const isTransactionMode = port === "6543";
   // Supabase only accepts TLS; a Postgres running on the developer's own
   // machine usually has it switched off, and demanding it there fails the

@@ -86,7 +86,13 @@ export interface QuestionFilter {
  * `is_live = false` — excluding questions currently in use on real exams — can
  * never be forgotten. Do not query `questions` for drill content anywhere else.
  */
-function availableQuestions(filter: QuestionFilter, extraSql = "", extraParams: unknown[] = []) {
+function availableQuestions(
+  filter: QuestionFilter,
+  extraSql = "",
+  extraParams: unknown[] = [],
+  /** An extra join, whose parameters bind before the WHERE clause's. */
+  join: { sql: string; params: unknown[] } = { sql: "", params: [] },
+) {
   const where: string[] = [
     "q.is_live = false", // non-negotiable: never serve an active item
     // Items the bank ships with no answer key can't be scored; once we've seen
@@ -127,8 +133,9 @@ function availableQuestions(filter: QuestionFilter, extraSql = "", extraParams: 
     // student-produced responses without fetching every candidate first.
     sql: `FROM questions q
           LEFT JOIN question_details qd ON qd.key = q.key
+          ${join.sql}
           WHERE ${where.join(" AND ")} ${extraSql}`,
-    params: [...params, ...extraParams],
+    params: [...join.params, ...params, ...extraParams],
   };
 }
 
@@ -143,6 +150,12 @@ export interface CandidateRow {
   external_id: string | null;
   /** 'mcq' | 'spr' when the body has been cached, null when it hasn't. */
   known_type: "mcq" | "spr" | null;
+  /**
+   * When this student last had the question in a drill, null if never. Only
+   * populated when asked for: it lets a module reach for the question seen
+   * longest ago rather than substitute a different skill.
+   */
+  last_seen_at?: Date | null;
 }
 
 export async function countAvailable(filter: QuestionFilter): Promise<number> {
@@ -151,14 +164,46 @@ export async function countAvailable(filter: QuestionFilter): Promise<number> {
   return Number(row?.n ?? 0);
 }
 
+/**
+ * Candidates for a drill.
+ *
+ * `limit` caps the sample; pass `null` for the whole pool, which the module
+ * builder needs — a random truncation is exactly what starves a small quota
+ * like Cross-Text Connections, and the pool is only a couple of thousand rows.
+ *
+ * `lastSeenFor` adds each question's most recent outing for that student.
+ * Ranking by it is what lets a module repeat the question seen longest ago
+ * instead of quietly filling the slot from another skill.
+ */
 export async function listCandidates(
   filter: QuestionFilter,
-  limit = 2000,
+  { limit = 2000, lastSeenFor = null }: { limit?: number | null; lastSeenFor?: string | null } = {},
 ): Promise<CandidateRow[]> {
-  const { sql: from, params } = availableQuestions(filter, "ORDER BY RANDOM() LIMIT ?", [limit]);
+  // The lateral runs per candidate and reaches drill_questions through its
+  // primary key, so it stays cheap even over the whole pool.
+  const seenJoin = lastSeenFor
+    ? {
+        sql: `LEFT JOIN LATERAL (
+                SELECT MAX(ds.created_at) AS last_seen_at
+                FROM drill_questions dq
+                JOIN drill_sets ds ON ds.id = dq.set_id
+                WHERE ds.user_id = ? AND dq.question_key = q.key
+              ) seen ON true`,
+        params: [lastSeenFor],
+      }
+    : { sql: "", params: [] };
+
+  const { sql: from, params } = availableQuestions(
+    filter,
+    limit === null ? "ORDER BY RANDOM()" : "ORDER BY RANDOM() LIMIT ?",
+    limit === null ? [] : [limit],
+    seenJoin,
+  );
+
   return all<CandidateRow>(
     `SELECT q.key, q.skill_name, q.domain_code, q.domain_name, q.difficulty,
-            q.source, q.ibn, q.external_id, qd.type AS known_type ${from}`,
+            q.source, q.ibn, q.external_id, qd.type AS known_type
+            ${lastSeenFor ? ", seen.last_seen_at" : ""} ${from}`,
     params,
   );
 }

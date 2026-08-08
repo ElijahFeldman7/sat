@@ -16,6 +16,13 @@ import type { Difficulty, ModuleKey } from "./types";
 
 export type ModulePart = 1 | 2;
 
+export interface SkillQuota {
+  /** `skill_name` on the questions table, in the bank's canonical spelling. */
+  name: string;
+  min: number;
+  max: number;
+}
+
 export interface DomainQuota {
   /** `domain_code` on the questions table — 'INI', 'CAS', 'H', 'P', … */
   code: string;
@@ -28,6 +35,12 @@ export interface DomainQuota {
    */
   min: number;
   max: number;
+  /**
+   * What the domain's questions are made of, in the order the real module
+   * presents them. A domain without this is allocated as a whole, which is how
+   * Math still works — its per-skill counts are not written down yet.
+   */
+  skills?: SkillQuota[];
 }
 
 export interface ModuleBlueprint {
@@ -51,11 +64,60 @@ export interface ModuleBlueprint {
   order: string[];
 }
 
+/**
+ * Reading and Writing, to the published shares of the section: Craft and
+ * Structure 28%, Information and Ideas 26%, Standard English Conventions 26%,
+ * Expression of Ideas 20%. Against 27 scored questions those come to 8/7/7/5,
+ * which is why every domain here lands on its maximum — the variation in a form
+ * is which *skills* inside a domain get the questions, not how many the domain
+ * gets.
+ *
+ * Skill names must match `skill_name` in the bank exactly; they are the only
+ * identifier it gives a skill.
+ */
 const RW_DOMAINS: DomainQuota[] = [
-  { code: "INI", name: "Information and Ideas", min: 7, max: 8 },
-  { code: "CAS", name: "Craft and Structure", min: 7, max: 8 },
-  { code: "EOI", name: "Expression of Ideas", min: 5, max: 6 },
-  { code: "SEC", name: "Standard English Conventions", min: 5, max: 6 },
+  {
+    code: "CAS",
+    name: "Craft and Structure",
+    min: 7,
+    max: 8,
+    skills: [
+      { name: "Words in Context", min: 5, max: 6 },
+      { name: "Text Structure and Purpose", min: 1, max: 2 },
+      { name: "Cross-Text Connections", min: 1, max: 1 },
+    ],
+  },
+  {
+    code: "INI",
+    name: "Information and Ideas",
+    min: 6,
+    max: 7,
+    skills: [
+      { name: "Central Ideas and Details", min: 2, max: 3 },
+      { name: "Command of Evidence", min: 3, max: 4 },
+      { name: "Inferences", min: 1, max: 2 },
+    ],
+  },
+  {
+    code: "SEC",
+    name: "Standard English Conventions",
+    min: 6,
+    max: 7,
+    skills: [
+      { name: "Boundaries", min: 2, max: 3 },
+      { name: "Form, Structure, and Sense", min: 4, max: 4 },
+    ],
+  },
+  {
+    code: "EOI",
+    name: "Expression of Ideas",
+    min: 4,
+    max: 5,
+    skills: [
+      { name: "Transitions", min: 2, max: 3 },
+      { name: "Rhetorical Synthesis", min: 2, max: 3 },
+    ],
+  },
 ];
 
 const MATH_DOMAINS: DomainQuota[] = [
@@ -158,37 +220,85 @@ function shuffled<T>(items: T[]): T[] {
   return out;
 }
 
-/**
- * How many questions each content domain gets on this run.
- *
- * Every domain starts at its published minimum; the questions left over are
- * handed out one at a time in random order among the domains with headroom, so
- * the totals always land inside the ranges College Board documents.
- */
-export function allocateDomains(bp: ModuleBlueprint): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const d of bp.domains) out[d.code] = d.min;
+interface Range {
+  key: string;
+  min: number;
+  max: number;
+}
 
-  let left = bp.questions - bp.domains.reduce((n, d) => n + d.min, 0);
+/**
+ * Spends `total` questions across a set of published ranges.
+ *
+ * Everything starts at its minimum; the questions left over are handed out one
+ * at a time in random order among the entries with headroom, so the totals land
+ * inside the ranges College Board documents and two runs of the same module are
+ * not the same shape.
+ */
+function spread(total: number, ranges: Range[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const r of ranges) out[r.key] = r.min;
+
+  let left = total - ranges.reduce((n, r) => n + r.min, 0);
 
   const headroom = shuffled(
-    bp.domains.flatMap((d) => Array.from({ length: Math.max(0, d.max - d.min) }, () => d.code)),
+    ranges.flatMap((r) => Array.from({ length: Math.max(0, r.max - r.min) }, () => r.key)),
   );
-  for (const code of headroom) {
+  for (const key of headroom) {
     if (left <= 0) break;
-    out[code]++;
+    out[key]++;
     left--;
   }
 
-  // Only reachable if a blueprint's minimums overshoot its own question count;
-  // trim the biggest domains rather than ship a module of the wrong length.
+  // The rest is only reachable when a blueprint's own numbers do not add up to
+  // its question count. Shipping a module of the wrong length would be worse
+  // than pushing one quota outside its range, so the remainder is forced.
+  const keys = ranges.map((r) => r.key);
+  for (let i = 0; left > 0 && keys.length; i++, left--) out[keys[i % keys.length]]++;
   while (left < 0) {
-    const biggest = Object.keys(out).sort((a, b) => out[b] - out[a])[0];
+    const biggest = keys.slice().sort((a, b) => out[b] - out[a])[0];
     out[biggest]--;
     left++;
   }
 
   return out;
+}
+
+/** How many questions each content domain gets on this run. */
+export function allocateDomains(bp: ModuleBlueprint): Record<string, number> {
+  return spread(
+    bp.questions,
+    bp.domains.map((d) => ({ key: d.code, min: d.min, max: d.max })),
+  );
+}
+
+/** A quota for one run: how many questions of one skill (or whole domain). */
+export interface QuotaAllocation {
+  /** `domain_code`. */
+  domain: string;
+  /** `skill_name`, or null for a domain allocated as a whole. */
+  skill: string | null;
+  count: number;
+}
+
+/**
+ * The run's quotas, in presentation order.
+ *
+ * Two passes: the domains split the module between them, then each domain
+ * splits its own share across its skills. Going through the domain first is
+ * what keeps a run of good luck on Words in Context from pushing Craft and
+ * Structure past its share of the section.
+ */
+export function allocateSkills(bp: ModuleBlueprint): QuotaAllocation[] {
+  const perDomain = allocateDomains(bp);
+
+  return bp.domains.flatMap((d): QuotaAllocation[] => {
+    if (!d.skills?.length) return [{ domain: d.code, skill: null, count: perDomain[d.code] }];
+    const perSkill = spread(
+      perDomain[d.code],
+      d.skills.map((s) => ({ key: s.name, min: s.min, max: s.max })),
+    );
+    return d.skills.map((s) => ({ domain: d.code, skill: s.name, count: perSkill[s.name] }));
+  });
 }
 
 /** Splits `n` questions across difficulties by weight, largest remainder first. */
@@ -210,17 +320,32 @@ export function splitByMix(n: number, mix: Record<Difficulty, number>): Record<D
   return { E: counts[0], M: counts[1], H: counts[2] };
 }
 
-/** Every (domain, difficulty) slot the blueprint asks for, in no order. */
-export function blueprintSlots(bp: ModuleBlueprint): { domain: string; difficulty: Difficulty }[] {
-  const perDomain = allocateDomains(bp);
-  const slots: { domain: string; difficulty: Difficulty }[] = [];
+export interface BlueprintSlot {
+  domain: string;
+  /** `skill_name`, or null where the blueprint only fixes the domain. */
+  skill: string | null;
+  difficulty: Difficulty;
+}
 
-  for (const domain of Object.keys(perDomain)) {
-    const split = splitByMix(perDomain[domain], bp.mix);
-    for (const difficulty of DIFFICULTIES) {
-      for (let i = 0; i < split[difficulty]; i++) slots.push({ domain, difficulty });
-    }
-  }
+/**
+ * Every slot the blueprint asks for, in no order.
+ *
+ * The difficulty mix is dealt across the module as a whole rather than applied
+ * to each quota. A skill that only gets one question — Cross-Text Connections —
+ * would otherwise land on whichever difficulty the largest remainder happened to
+ * favour, in every module ever generated. Dealing from one shuffled pile keeps
+ * the module's overall E/M/H profile exact while leaving any given skill free to
+ * come up at any level.
+ */
+export function blueprintSlots(bp: ModuleBlueprint): BlueprintSlot[] {
+  const seats = allocateSkills(bp).flatMap((q) =>
+    Array.from({ length: q.count }, () => ({ domain: q.domain, skill: q.skill })),
+  );
 
-  return slots;
+  const split = splitByMix(seats.length, bp.mix);
+  const levels = shuffled(
+    DIFFICULTIES.flatMap((d) => Array.from({ length: split[d] }, () => d)),
+  );
+
+  return seats.map((seat, i) => ({ ...seat, difficulty: levels[i] }));
 }

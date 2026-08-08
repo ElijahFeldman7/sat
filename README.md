@@ -29,6 +29,35 @@ The schema is created automatically on first query. Everything lives in a `sat`
 schema that is not exposed to the Supabase Data API, with RLS enabled on every
 table as defence in depth.
 
+### Which database you are on
+
+`.env` holds the live project's credentials. `.env.local` sits on top of it and
+is loaded last, so day-to-day work runs against a throwaway Postgres on your own
+machine and nothing you do while building touches real accounts:
+
+```
+# .env.local  (git-ignored)
+POOLER_URL=postgresql://<you>@127.0.0.1:5432/sat_local
+CONNECTION_STRING=postgresql://<you>@127.0.0.1:5432/sat_local
+```
+
+Create the database once with `createdb sat_local`; the schema builds itself on
+the first query, and the catalog syncs on the first drill. Supabase's schema
+revokes from the `anon` and `authenticated` roles, so a plain Postgres needs them
+to exist:
+
+```sql
+CREATE ROLE anon NOLOGIN;
+CREATE ROLE authenticated NOLOGIN;
+```
+
+Every process prints what it connected to on its first query —
+`[db] local → 127.0.0.1/sat_local` — so it is never a guess. To work against the
+real database, rename the override: `mv .env.local .env.local.off`.
+
+The verification scripts write test data and refuse to run against anything but a
+local database; `ALLOW_REMOTE_WRITES=1` overrides that if you mean it.
+
 ### Signing in locally
 
 Google is not needed to click around. With `AUTH_SECRET` and a database URL set,
@@ -97,23 +126,32 @@ lib/db/           schema, Postgres client, every query, catalog sync
 components/       app chrome — AppShell/AppNav, TimeTracker
 components/exam/  the Bluebook replica
 app/              routes and API handlers
-scripts/          verify.ts (end-to-end checks), backfill.ts, shoot.mjs, dev-session.ts
+scripts/          verify*.ts|mts (checks), backfill.ts, shoot.mjs, dev-session.ts
 ```
 
 ## Verifying
 
 ```bash
-npx tsx --env-file=.env scripts/verify.ts
+npm run verify            # catalog sync, live-item guard, selection, grading
+npm run verify:module     # mock modules built from the bank, to the blueprint
+npm run verify:blueprint  # blueprint allocation, no database needed
+npm run verify:marks      # passage highlighting's range surgery, in jsdom
 ```
 
-Syncs the catalog and asserts the live-item guard, selection filters, question
-normalization for both sources, grading (including SPR fraction/decimal
+`verify` syncs the catalog and asserts the live-item guard, selection filters,
+question normalization for both sources, grading (including SPR fraction/decimal
 equivalence), and that no live or ungradable question can reach a drill.
+
+`verify:module` builds real mock modules and checks the pool can serve every
+skill quota, in the section's order, and still can after a dozen builds.
+
+Every script that reads the database goes through the same `.env` + `.env.local`
+pair as the app, so the local override applies to all of them.
 
 ## Backfilling
 
 ```bash
-npx tsx --env-file=.env scripts/backfill.ts
+npm run backfill
 ```
 
 Downloads every non-live question body so gradability is known before a drill

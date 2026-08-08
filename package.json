@@ -6,7 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "verify": "tsx --env-file=.env --env-file-if-exists=.env.local scripts/verify.ts",
+    "verify:module": "tsx --env-file=.env --env-file-if-exists=.env.local scripts/verify-module.mts",
+    "verify:blueprint": "tsx scripts/verify-blueprint.mts",
+    "verify:marks": "tsx scripts/verify-marks.mts",
+    "backfill": "tsx --env-file=.env --env-file-if-exists=.env.local scripts/backfill.ts",
+    "dev-session": "tsx --env-file=.env --env-file-if-exists=.env.local scripts/dev-session.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

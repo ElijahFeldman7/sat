@@ -87,6 +87,9 @@ const DIFFICULTIES: Difficulty[] = ["E", "M", "H"];
 const cache = new Map<string, TopicDomain[]>();
 const inFlight = new Map<string, Promise<{ domains: TopicDomain[]; error: string | null }>>();
 
+/** "5–6", or just "4" where the blueprint fixes the count. */
+const range = (q: { min: number; max: number }) => (q.min === q.max ? `${q.min}` : `${q.min}–${q.max}`);
+
 function fetchTopics(key: string) {
   const existing = inFlight.get(key);
   if (existing) return existing;
@@ -346,9 +349,9 @@ export function DrillBuilder() {
             {MODULES[module].name} module
           </h2>
           <p className="mt-[4px] text-[15px] leading-[1.5] text-black/55">
-            A full module on the real clock, assembled from questions you haven&rsquo;t seen to
-            the blueprint College Board publishes. It counts towards your topic stats and review
-            queue like any other drill.
+            A full module on the real clock, built to the blueprint College Board publishes:
+            the same number of every skill, in the order the section asks them. It counts
+            towards your topic stats and review queue like any other drill.
           </p>
 
           <div className="mt-[16px] grid gap-[10px] sm:grid-cols-2">
@@ -399,13 +402,28 @@ export function DrillBuilder() {
             ))}
           </dl>
 
+          {/*
+            What the module will contain. Domains that publish a per-skill
+            breakdown list it underneath; the ones that don't yet — Math — show
+            their total alone.
+          */}
           <ul className="mt-[16px] space-y-[7px] border-t border-black/8 pt-[14px] text-[14px]">
             {blueprint.domains.map((d) => (
-              <li key={d.code} className="flex items-center justify-between gap-[14px]">
-                <span className="min-w-0 truncate text-bb-ink">{d.name}</span>
-                <span className="shrink-0 tabular-nums text-black/50">
-                  {d.min === d.max ? d.min : `${d.min}–${d.max}`}
-                </span>
+              <li key={d.code}>
+                <div className="flex items-center justify-between gap-[14px]">
+                  <span className="min-w-0 truncate font-bold text-bb-ink">{d.name}</span>
+                  <span className="shrink-0 tabular-nums text-black/50">{range(d)}</span>
+                </div>
+                {d.skills && (
+                  <ul className="mt-[4px] space-y-[3px] pl-[14px]">
+                    {d.skills.map((s) => (
+                      <li key={s.name} className="flex items-center justify-between gap-[14px]">
+                        <span className="min-w-0 truncate text-black/60">{s.name}</span>
+                        <span className="shrink-0 tabular-nums text-black/40">{range(s)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </li>
             ))}
           </ul>
@@ -414,8 +432,8 @@ export function DrillBuilder() {
             <Toggle
               checked={excludeSeen}
               onChange={setExcludeSeen}
-              label="Only questions I haven't seen"
-              hint="Turn off to allow repeats"
+              label="Prefer questions I haven't seen"
+              hint="A topic that runs out repeats the one you saw longest ago, rather than giving up its place in the module"
             />
             {module === "math" && (
               <Toggle

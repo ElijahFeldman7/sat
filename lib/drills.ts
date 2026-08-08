@@ -1,6 +1,10 @@
 import type { Difficulty, ModuleKey } from "@/lib/qbank/types";
 import { MODULES } from "@/lib/qbank/types";
-import { blueprintSlots, type ModuleBlueprint } from "@/lib/qbank/blueprint";
+import {
+  blueprintSlots,
+  type BlueprintSlot,
+  type ModuleBlueprint,
+} from "@/lib/qbank/blueprint";
 import {
   createDrillSet,
   dueSrsKeys,
@@ -180,67 +184,100 @@ const DIFFICULTY_ORDER: Difficulty[] = ["E", "M", "H"];
  * Craft and Structure questions that are all Words in Context is not what the
  * real module looks like, even though the domain total is right.
  */
-function bucketPool(candidates: CandidateRow[]): Map<string, CandidateRow[]> {
-  const buckets = new Map<string, Map<string, CandidateRow[]>>();
+/** How many of the least-recently-seen questions a repeat is drawn from. */
+const RESAMPLE_WINDOW = 5;
 
+const bucketKey = (skill: string, difficulty: Difficulty) => `${skill}|${difficulty}`;
+
+/**
+ * Buckets the pool by skill and difficulty, each bucket in the order a slot
+ * should take from it: questions the student has never seen first, then the ones
+ * seen longest ago.
+ *
+ * The repeat end is not strictly oldest-first. The oldest few are shuffled among
+ * themselves, so a student who exhausts a thin skill — Cross-Text Connections
+ * has a hundred-odd questions and a module wants one — does not get the same
+ * question in the same place every time.
+ */
+function bucketPool(candidates: CandidateRow[]): Map<string, CandidateRow[]> {
+  const buckets = new Map<string, CandidateRow[]>();
   for (const c of candidates) {
-    const key = `${c.domain_code}|${c.difficulty}`;
-    const bySkill = buckets.get(key) ?? new Map<string, CandidateRow[]>();
-    const skill = bySkill.get(c.skill_name) ?? [];
-    skill.push(c);
-    bySkill.set(c.skill_name, skill);
-    buckets.set(key, bySkill);
+    const key = bucketKey(c.skill_name, c.difficulty);
+    const bucket = buckets.get(key);
+    if (bucket) bucket.push(c);
+    else buckets.set(key, [c]);
   }
 
-  const out = new Map<string, CandidateRow[]>();
-  for (const [key, bySkill] of buckets) {
-    const lists = [...bySkill.values()];
-    const interleaved: CandidateRow[] = [];
-    for (let round = 0; interleaved.length < lists.reduce((n, l) => n + l.length, 0); round++) {
-      for (const list of lists) if (round < list.length) interleaved.push(list[round]);
-    }
-    out.set(key, interleaved);
+  for (const [key, bucket] of buckets) {
+    const unseen = shuffle(bucket.filter((c) => !c.last_seen_at));
+    const seen = bucket
+      .filter((c) => c.last_seen_at)
+      .sort((a, b) => a.last_seen_at!.getTime() - b.last_seen_at!.getTime());
+
+    buckets.set(key, [
+      ...unseen,
+      ...shuffle(seen.slice(0, RESAMPLE_WINDOW)),
+      ...seen.slice(RESAMPLE_WINDOW),
+    ]);
+  }
+  return buckets;
+}
+
+function shuffle<T>(items: T[]): T[] {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
   }
   return out;
 }
 
 /**
- * Bucket keys to try for one slot, best first: the exact cell, then the same
- * domain at a neighbouring difficulty, then the same difficulty elsewhere, then
- * anything at all. A thin pool degrades one axis at a time instead of collapsing
- * to whatever is left.
+ * Which difficulties to try when the wanted one is exhausted: down first, then
+ * up. A module that asks for a hard question and cannot get one is better served
+ * by a medium than by an easy, and better by either than by dropping the skill.
  */
-function fallbackOrder(
-  domain: string,
-  difficulty: Difficulty,
-  domains: string[],
-): string[] {
-  const others = DIFFICULTY_ORDER.filter((d) => d !== difficulty).sort(
-    (a, b) =>
-      Math.abs(DIFFICULTY_ORDER.indexOf(a) - DIFFICULTY_ORDER.indexOf(difficulty)) -
-      Math.abs(DIFFICULTY_ORDER.indexOf(b) - DIFFICULTY_ORDER.indexOf(difficulty)),
-  );
-
-  return [
-    `${domain}|${difficulty}`,
-    ...others.map((d) => `${domain}|${d}`),
-    ...domains.filter((d) => d !== domain).map((d) => `${d}|${difficulty}`),
-    ...domains.flatMap((d) => others.map((o) => `${d}|${o}`)),
-  ];
+function difficultyLadder(want: Difficulty): Difficulty[] {
+  const i = DIFFICULTY_ORDER.indexOf(want);
+  return [...DIFFICULTY_ORDER.slice(0, i).reverse(), ...DIFFICULTY_ORDER.slice(i + 1)];
 }
 
-interface ModuleSlot {
-  domain: string;
-  difficulty: Difficulty;
+/**
+ * Bucket keys to try for one slot, best first.
+ *
+ * The skill is what the blueprint is really asking for, so it is the last thing
+ * given up: the exact cell, then the same skill at another difficulty, then a
+ * sibling skill in the same domain, and only then anything at all. Inside a
+ * bucket the ordering already prefers questions the student has not seen, so
+ * repeating the one seen longest ago comes before changing the module's shape.
+ */
+function fallbackOrder(
+  slot: ModuleSlot,
+  skillsByDomain: Map<string, string[]>,
+  allSkills: string[],
+): string[] {
+  const inDomain = skillsByDomain.get(slot.domain) ?? [];
+  // A slot with no skill of its own — a Math blueprint, which only fixes the
+  // domain — treats every skill in its domain as first choice.
+  const own = slot.skill ? [slot.skill] : inDomain;
+  const siblings = inDomain.filter((s) => !own.includes(s));
+  const rest = allSkills.filter((s) => !own.includes(s) && !siblings.includes(s));
+  const others = difficultyLadder(slot.difficulty);
+
+  const tiers = [own, siblings, rest];
+  return tiers.flatMap((skills) => [
+    ...skills.map((s) => bucketKey(s, slot.difficulty)),
+    ...skills.flatMap((s) => others.map((d) => bucketKey(s, d))),
+  ]);
+}
+
+interface ModuleSlot extends BlueprintSlot {
   /** Math modules put a fixed share of grid-ins at the end of the module. */
   wantSpr: boolean;
 }
 
 /** Marks `sprShare` of the slots as student-produced, spread over the module. */
-function markSprSlots(
-  slots: { domain: string; difficulty: Difficulty }[],
-  sprShare: number,
-): ModuleSlot[] {
+function markSprSlots(slots: BlueprintSlot[], sprShare: number): ModuleSlot[] {
   const target = Math.round(slots.length * sprShare);
   const picked = new Set<number>();
   const order = slots.map((_, i) => i).sort(() => Math.random() - 0.5);
@@ -258,20 +295,33 @@ function markSprSlots(
 function fillSlots(
   slots: ModuleSlot[],
   pool: Map<string, CandidateRow[]>,
-  domains: string[],
+  skillsByDomain: Map<string, string[]>,
+  allSkills: string[],
   taken: Set<string>,
 ): (CandidateRow | null)[] {
   return slots.map((slot) => {
-    const keys = fallbackOrder(slot.domain, slot.difficulty, domains);
+    const keys = fallbackOrder(slot, skillsByDomain, allSkills);
 
-    // Two sweeps: the first insists on the slot's question type, the second
-    // accepts anything. An unknown type is a maybe, so it satisfies neither
-    // sweep's preference outright but is taken on the second.
-    for (const strict of [true, false]) {
-      for (const key of keys) {
-        for (const candidate of pool.get(key) ?? []) {
+    /*
+     * The bucket is the outer loop and the question type the inner one, so the
+     * blueprint's own quota always outranks a preference for grid-in or
+     * multiple-choice: within a bucket the wanted type wins, but wanting it is
+     * never a reason to take a question from a different skill.
+     *
+     * Getting this the other way round is invisible against a warm cache — when
+     * `known_type` is known for most of the pool the exact bucket satisfies the
+     * strict pass anyway — and quietly wrecks the composition against a cold
+     * one, where the handful of questions with a cached type get picked from
+     * whatever skill happens to have them.
+     */
+    for (const key of keys) {
+      const bucket = pool.get(key) ?? [];
+      for (const strict of [true, false]) {
+        for (const candidate of bucket) {
           if (taken.has(candidate.key)) continue;
           if (strict) {
+            // An unknown type is a maybe: it loses the strict pass, and is
+            // taken on the loose one.
             const isSpr = candidate.known_type === "spr";
             if (candidate.known_type === null || isSpr !== slot.wantSpr) continue;
           }
@@ -305,26 +355,41 @@ export async function createModuleDrill(
 ) {
   const { blueprint: bp } = input;
 
-  const candidates = await listCandidates({
-    assessmentId: input.assessmentId,
-    module: bp.module,
-    includeLegacy: input.includeLegacy && bp.module === "math",
-    excludeSeenFor: input.excludeSeen ? userId : null,
-  });
+  /*
+   * The whole pool, unfiltered and unsampled. A blueprint asks for a set number
+   * of each skill, so a random truncation is exactly what would starve a small
+   * quota; and questions the student has already seen are ranked rather than
+   * excluded, so a thin skill can repeat its least-recent question instead of
+   * being quietly replaced by a different skill.
+   */
+  const candidates = await listCandidates(
+    {
+      assessmentId: input.assessmentId,
+      module: bp.module,
+      includeLegacy: input.includeLegacy && bp.module === "math",
+    },
+    { limit: null, lastSeenFor: input.excludeSeen ? userId : null },
+  );
 
   if (candidates.length < bp.questions) {
     throw new Error(
-      `Not enough unused ${MODULES[bp.module].name} questions left for a full module. ` +
-        "Turn off “only questions I haven’t seen” to allow repeats.",
+      `Not enough ${MODULES[bp.module].name} questions in the bank for a full module.`,
     );
   }
 
   const pool = bucketPool(candidates);
-  const domains = bp.domains.map((d) => d.code);
+  const skillsByDomain = new Map<string, string[]>();
+  for (const c of candidates) {
+    const skills = skillsByDomain.get(c.domain_code) ?? [];
+    if (!skills.includes(c.skill_name)) skills.push(c.skill_name);
+    skillsByDomain.set(c.domain_code, skills);
+  }
+  const allSkills = [...new Set(candidates.map((c) => c.skill_name))];
+
   const slots = markSprSlots(blueprintSlots(bp), bp.sprShare);
   const taken = new Set<string>();
 
-  const filled = fillSlots(slots, pool, domains, taken);
+  const filled = fillSlots(slots, pool, skillsByDomain, allSkills, taken);
   const details = await loadDetails(filled.filter((c): c is CandidateRow => c !== null));
 
   /** A slot is only done when its question came back and can be scored. */
@@ -342,7 +407,8 @@ export async function createModuleDrill(
     const replacements = fillSlots(
       bad.map(({ i }) => slots[i]),
       pool,
-      domains,
+      skillsByDomain,
+      allSkills,
       taken,
     );
     const fresh = replacements.filter((c): c is CandidateRow => c !== null);
@@ -362,15 +428,24 @@ export async function createModuleDrill(
   }
 
   /*
-   * On-screen order. Reading and Writing runs whole domains at a time, easiest
-   * first inside each. Math mixes domains, climbs in difficulty, and keeps every
-   * grid-in for the end of the module — which is exactly where Bluebook puts
-   * them.
+   * On-screen order. Reading and Writing runs whole domains at a time and, inside
+   * a domain, whole skills at a time in the sequence the real section uses —
+   * Words in Context, then Text Structure and Purpose, then Cross-Text
+   * Connections, and so on — easiest first within a skill. Math mixes domains,
+   * climbs in difficulty, and keeps every grid-in for the end of the module,
+   * which is exactly where Bluebook puts them.
    */
+  const skillRank = new Map(
+    bp.domains.flatMap((d) => (d.skills ?? []).map((s, i) => [s.name, i] as const)),
+  );
+
   const ordered = [...usable].sort((a, b) => {
     if (bp.module === "rw") {
       const byDomain = bp.order.indexOf(a.domain_code) - bp.order.indexOf(b.domain_code);
       if (byDomain !== 0) return byDomain;
+      const bySkill =
+        (skillRank.get(a.skill_name) ?? 99) - (skillRank.get(b.skill_name) ?? 99);
+      if (bySkill !== 0) return bySkill;
     } else {
       const aSpr = details.get(a.key)!.type === "spr";
       const bSpr = details.get(b.key)!.type === "spr";

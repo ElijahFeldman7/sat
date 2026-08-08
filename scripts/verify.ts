@@ -5,7 +5,7 @@
  * The headline assertion is the live-item guard: no question the app can serve
  * may be one that is currently in use on a real exam.
  */
-import { all, close, get } from "@/lib/db/index";
+import { all, close, dbTarget, get } from "@/lib/db/index";
 import { getCatalog, syncCatalog } from "@/lib/db/sync";
 import {
   countAvailable,
@@ -20,6 +20,23 @@ import { isGradable } from "@/lib/qbank/normalize";
 import { createDrill } from "@/lib/drills";
 import { ASSESSMENTS, type ModuleKey } from "@/lib/qbank/types";
 
+/**
+ * Refuses to run against anything but a local database.
+ *
+ * This script writes: it creates a user and a pile of drills, then removes
+ * them. Pointed at the live database by whichever `.env` file happened to win,
+ * that is somebody's real account. Set ALLOW_REMOTE_WRITES=1 to override.
+ */
+function requireLocalDatabase(script: string) {
+  const target = dbTarget();
+  if (target.isLocal || process.env.ALLOW_REMOTE_WRITES === "1") return;
+  console.error(
+    `\n${script} writes test data, and ${target.host}/${target.database} is not a local database.\n` +
+      "Point .env.local at a local Postgres, or set ALLOW_REMOTE_WRITES=1 to do it anyway.\n",
+  );
+  process.exit(1);
+}
+
 let failures = 0;
 
 function check(label: string, ok: boolean, detail = "") {
@@ -32,6 +49,8 @@ function section(title: string) {
 }
 
 async function main() {
+  requireLocalDatabase("verify.ts");
+
   section("1. Catalog sync");
   const t0 = Date.now();
   const { counts } = await syncCatalog(true);
@@ -96,7 +115,7 @@ async function main() {
   for (const moduleKey of ["math", "rw"] as ModuleKey[]) {
     const candidates = await listCandidates(
       { assessmentId: 99, module: moduleKey, includeLegacy: true },
-      5000,
+      { limit: 5000 },
     );
     const leaked = await all<{ key: string }>(
       `SELECT key FROM questions
@@ -185,7 +204,7 @@ async function main() {
 
   section("5. Legacy disclosed items");
   const legacy = (
-    await listCandidates({ assessmentId: 99, module: "math", includeLegacy: true }, 5000)
+    await listCandidates({ assessmentId: 99, module: "math", includeLegacy: true }, { limit: 5000 })
   ).filter((c) => c.source === "legacy");
   check("legacy items exist in the pool", legacy.length > 0, `${legacy.length}`);
   if (legacy.length) {
